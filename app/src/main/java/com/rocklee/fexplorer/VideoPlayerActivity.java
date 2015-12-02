@@ -28,6 +28,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.rocklee.fexplorer.CustomView.RangeSeekBar;
 import com.rocklee.fexplorer.Decoder.VideoDecoder;
 
 import java.io.ByteArrayInputStream;
@@ -42,6 +43,7 @@ public class VideoPlayerActivity extends Activity {
     //update seekbar time
     private final static int UPDATE_CURRENT_TIME = 0;
     private final static int LOAD_PHOTO = 1;
+    private final static int UPDATE_PLAY_STATE = 2;
     //In a sequence the max video duration is 50000000us
     private final static long MAX_SEQUENCE_LENGTH = 50000000;
     //A sequence should have 7 image
@@ -61,6 +63,7 @@ public class VideoPlayerActivity extends Activity {
     private Bitmap[] bitmap_list = new Bitmap[IMAGE_LIST];
     private Bitmap[] temp_list = new Bitmap[IMAGE_LIST];
     private ImageView playbackPreview, trimLeftButton, trimRightButton;
+    private RangeSeekBar rangeSeekBar;
 
 
     private MediaPlayer mediaPlayer = null;
@@ -96,6 +99,14 @@ public class VideoPlayerActivity extends Activity {
                         }
                     }
                     break;
+                case UPDATE_PLAY_STATE:
+                    if (mediaPlayer.isPlaying()) {
+                        playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.play_bg));
+                        mediaPlayer.pause();
+                    } else {
+                        playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.pause_bg));
+                        mediaPlayer.start();
+                    }
                 default:
                     break;
             }
@@ -162,6 +173,11 @@ public class VideoPlayerActivity extends Activity {
             public boolean onLongClick(View v) {
                 Log.d(TAG, "sequence_startTime:" + sequence_startTime +
                         " sequence_duration:" + sequence_duration);
+                if (mediaPlayer.isPlaying()) {
+                    Message message = new Message();
+                    message.what = UPDATE_PLAY_STATE;
+                    handler.sendMessage(message);
+                }
                 long next_sequence_startTime = sequence_startTime;
                 if (next_sequence_startTime - MAX_SEQUENCE_LENGTH < 0)
                     return false;
@@ -186,6 +202,11 @@ public class VideoPlayerActivity extends Activity {
         trimRightButton.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
+                if (mediaPlayer.isPlaying()) {
+                    Message message = new Message();
+                    message.what = UPDATE_PLAY_STATE;
+                    handler.sendMessage(message);
+                }
                 long prev_sequence_startTime = sequence_startTime;
                 long prev_sequence_duration = sequence_duration;
                 if (prev_sequence_startTime + MAX_SEQUENCE_LENGTH >= (maxDuration * 1000))
@@ -212,6 +233,24 @@ public class VideoPlayerActivity extends Activity {
                     }
                 }).start();
                 return true;
+            }
+        });
+
+        rangeSeekBar = (RangeSeekBar) findViewById(R.id.range_seekbar);
+        rangeSeekBar.setOnSeekBarChangeListener(new RangeSeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressBefore() {
+
+            }
+
+            @Override
+            public void onProgressChanged(RangeSeekBar seekBar, double progressLow, double progressHigh) {
+
+            }
+
+            @Override
+            public void onProgressAfter() {
+
             }
         });
     }
@@ -288,13 +327,16 @@ public class VideoPlayerActivity extends Activity {
                 mediaPlayer.pause();
                 isPlaying = false;
             } else if (v == playbackPreview) {
-                if (mediaPlayer.isPlaying()) {
-                    playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.play_bg));
-                    mediaPlayer.pause();
-                } else {
-                    playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.pause_bg));
-                    mediaPlayer.start();
-                }
+                Message message = new Message();
+                message.what = UPDATE_PLAY_STATE;
+                handler.sendMessage(message);
+//                if (mediaPlayer.isPlaying()) {
+//                    playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.play_bg));
+//                    mediaPlayer.pause();
+//                } else {
+//                    playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.pause_bg));
+//                    mediaPlayer.start();
+//                }
             }
         }
     }
@@ -411,11 +453,33 @@ public class VideoPlayerActivity extends Activity {
                         firstGetImage();
                     }
                 }).start();
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        while (true) {
+                            if (isExit)
+                                break;
+                            if (mediaPlayer.isPlaying() && isupdateImageOver) {
+                                if (mediaPlayer.getCurrentPosition() * 1000 >= sequence_startTime + sequence_duration) {
+                                    Message message = new Message();
+                                    message.what = UPDATE_PLAY_STATE;
+                                    handler.sendMessage(message);
+                                }
+                            }
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }).start();
             }
         });
         mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
             @Override
             public void onCompletion(MediaPlayer arg0) {
+                playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.play_bg));
                 Toast.makeText(VideoPlayerActivity.this, "video end!", Toast.LENGTH_SHORT).show();
             }
         });
@@ -502,6 +566,7 @@ public class VideoPlayerActivity extends Activity {
     }
 
     public void shiftRight() {
+        mediaPlayer.seekTo((int)(sequence_startTime/1000));
         if (temp_list_state == 3) {
             for (int i = 0; i < temp_list.length; i++) {
                 bitmap_list[i] = temp_list[i];
@@ -523,6 +588,7 @@ public class VideoPlayerActivity extends Activity {
     }
 
     public void shiftLeft() {
+        mediaPlayer.seekTo((int)(sequence_startTime/1000));
         if (temp_list_state == 2) {
             for (int i = 0; i < temp_list.length; i++) {
                 bitmap_list[i] = temp_list[i];
