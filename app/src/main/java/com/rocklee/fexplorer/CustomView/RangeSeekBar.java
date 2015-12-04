@@ -2,13 +2,16 @@ package com.rocklee.fexplorer.CustomView;
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Scroller;
 
 import com.rocklee.fexplorer.R;
 
@@ -44,7 +47,7 @@ public class RangeSeekBar extends View {
     private double mOffsetHigh = 0;    //后滑块中心坐标
     private int mDistance = 0;      //总刻度是固定距离 两边各去掉半个滑块距离
 
-    private int mThumbMarginTop = 30;   //滑动块顶部距离上边框距离，也就是距离字体顶部的距离
+    private int mThumbMarginTop = 0;   //滑动块顶部距离上边框距离，也就是距离字体顶部的距离
 
     private int mFlag = CLICK_INVAILD;
     private OnSeekBarChangeListener mBarChangeListener;
@@ -67,8 +70,8 @@ public class RangeSeekBar extends View {
 //        this.setBackgroundColor(Color.BLACK);
 
         Resources resources = getResources();
-        notScrollBarBg = resources.getDrawable(R.drawable.progress_bg);
-        hasScrollBarBg = resources.getDrawable(R.drawable.normal_bg);
+        notScrollBarBg = resources.getDrawable(R.drawable.normal_bg);//normal_bg
+        hasScrollBarBg = resources.getDrawable(R.drawable.progress_bg);//progress_bg
         mThumbLow = resources.getDrawable(R.drawable.trim_left);
         mThumbHigh = resources.getDrawable(R.drawable.trim_right);
 
@@ -80,27 +83,35 @@ public class RangeSeekBar extends View {
 
         mThumbWidth = mThumbLow.getIntrinsicWidth();
         mThumbHeight = mThumbLow.getIntrinsicHeight();
-
+        Log.d(TAG, "mThumbWidth:" + mThumbWidth + " mThumbHeight:" + mThumbHeight);
     }
 
     //默认执行，计算view的宽高,在onDraw()之前
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = measureWidth(widthMeasureSpec);
-//        int height = measureHeight(heightMeasureSpec);
+        int height = measureHeight(heightMeasureSpec);
+        Log.d(TAG, "width:" + width + " height:" + height);
+//        int width = widthMeasureSpec;
+//        int height = heightMeasureSpec;
         mScollBarWidth = width;
-        mOffsetHigh = width - mThumbWidth / 2;
-        mOffsetLow = mThumbWidth / 2;
+        mScollBarHeight = height;
+//        mThumbWidth = width;
+//        mThumbHeight = height;
+//        mOffsetHigh = width - mThumbWidth / 2;
+//        mOffsetLow = mThumbWidth / 2;
         mDistance = width - mThumbWidth;
 
-        mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance ))+ mThumbWidth / 2;
+        mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance )) + mThumbWidth / 2;
         mOffsetHigh = formatDouble(defaultScreenHigh / 100 * (mDistance)) + mThumbWidth / 2;
-        setMeasuredDimension(width, mThumbHeight + mThumbMarginTop+2);
+        //setMeasuredDimension(width, mThumbHeight + mThumbMarginTop+2);
+        setMeasuredDimension(width, height);
     }
 
 
     private int measureWidth(int measureSpec) {
         int specMode = MeasureSpec.getMode(measureSpec);
         int specSize = MeasureSpec.getSize(measureSpec);
+        Log.d(TAG, "specMode:" + specMode + " specSize:" + specSize);
         //wrap_content
         if (specMode == MeasureSpec.AT_MOST) {
         }
@@ -114,31 +125,33 @@ public class RangeSeekBar extends View {
     private int measureHeight(int measureSpec) {
         int specMode = MeasureSpec.getMode(measureSpec);
         int specSize = MeasureSpec.getSize(measureSpec);
-        int defaultHeight = 100;
+        //int defaultHeight = 100;
         //wrap_content
         if (specMode == MeasureSpec.AT_MOST) {
         }
         //fill_parent或者精确值
         else if (specMode == MeasureSpec.EXACTLY) {
-            defaultHeight = specSize;
+            //defaultHeight = specSize;
         }
 
-        return defaultHeight;
+        //return defaultHeight;
+        return specSize;
     }
 
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
     }
 
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
+        Log.d(TAG, "onDraw");
         Paint text_Paint = new Paint();
         text_Paint.setTextAlign(Paint.Align.CENTER);
         text_Paint.setColor(Color.RED);
         text_Paint.setTextSize(20);
 
-        int aaa = mThumbMarginTop + mThumbHeight / 2 - mScollBarHeight / 2;
+        int aaa = 0;//mThumbMarginTop + mThumbHeight / 2 - mScollBarHeight / 2;
         int bbb = aaa + mScollBarHeight;
 
         //白色，不会动
@@ -157,9 +170,13 @@ public class RangeSeekBar extends View {
         mThumbHigh.setBounds((int)(mOffsetHigh - mThumbWidth / 2), mThumbMarginTop, (int)(mOffsetHigh + mThumbWidth / 2), mThumbHeight + mThumbMarginTop);
         mThumbHigh.draw(canvas);
 
-        double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
-        double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
-//            Log.d(TAG, "onDraw-->mOffsetLow: " + mOffsetLow + "  mOffsetHigh: " + mOffsetHigh   + "  progressLow: " + progressLow + "  progressHigh: " + progressHigh);
+//        double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
+//        double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
+        Log.d(TAG, "123");
+        double progressLow = formatDouble((mOffsetLow) * 100 / mDistance);
+        Log.d(TAG, "234");
+        double progressHigh = formatDouble((mOffsetHigh) * 100 / mDistance);
+        Log.d(TAG, "onDraw-->mOffsetLow: " + mOffsetLow + "  mOffsetHigh: " + mOffsetHigh   + "  progressLow: " + progressLow + "  progressHigh: " + progressHigh);
         canvas.drawText((int) progressLow + "", (int)mOffsetLow - 2 - 2, 15, text_Paint);
         canvas.drawText((int) progressHigh + "", (int)mOffsetHigh - 2, 15, text_Paint);
 
@@ -353,6 +370,7 @@ public class RangeSeekBar extends View {
     }*/
 
     public static double formatDouble(double pDouble) {
+        Log.d(TAG, "pDouble" + pDouble);
         BigDecimal bd = new BigDecimal(pDouble);
         BigDecimal bd1 = bd.setScale(2, BigDecimal.ROUND_HALF_UP);
         pDouble = bd1.doubleValue();
