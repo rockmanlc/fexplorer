@@ -43,6 +43,9 @@ public class RangeSeekBar extends View {
     private int mThumbWidth;        //滑动块宽度
     private int mThumbHeight;       //滑动块高度
 
+    private int thumbWidth;        //滑动块宽度
+    private int thumbHeight;       //滑动块高度
+
     private double mOffsetLow = 0;     //前滑块中心坐标
     private double mOffsetHigh = 0;    //后滑块中心坐标
     private int mDistance = 0;      //总刻度是固定距离 两边各去掉半个滑块距离
@@ -83,6 +86,8 @@ public class RangeSeekBar extends View {
 
         mThumbWidth = mThumbLow.getIntrinsicWidth();
         mThumbHeight = mThumbLow.getIntrinsicHeight();
+        thumbWidth = mThumbLow.getIntrinsicWidth();
+        thumbHeight = mThumbLow.getIntrinsicHeight();
         Log.d(TAG, "mThumbWidth:" + mThumbWidth + " mThumbHeight:" + mThumbHeight);
     }
 
@@ -95,16 +100,13 @@ public class RangeSeekBar extends View {
 //        int height = heightMeasureSpec;
         mScollBarWidth = width;
         mScollBarHeight = height;
-//        mThumbWidth = width;
-//        mThumbHeight = height;
-//        mOffsetHigh = width - mThumbWidth / 2;
-//        mOffsetLow = mThumbWidth / 2;
+        mOffsetHigh = width - mThumbWidth / 2;
+        mOffsetLow = mThumbWidth / 2;
         mDistance = width - mThumbWidth;
 
         mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance )) + mThumbWidth / 2;
         mOffsetHigh = formatDouble(defaultScreenHigh / 100 * (mDistance)) + mThumbWidth / 2;
-        //setMeasuredDimension(width, mThumbHeight + mThumbMarginTop+2);
-        setMeasuredDimension(width, height);
+        setMeasuredDimension(width, mThumbHeight + mThumbMarginTop+2);
     }
 
 
@@ -140,6 +142,11 @@ public class RangeSeekBar extends View {
 
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         super.onLayout(changed, l, t, r, b);
+        int vwidth = getWidth();
+        int vheight = getHeight();
+        mThumbHeight = vheight;
+        mThumbWidth = (thumbWidth * vheight)/thumbHeight;
+        Log.d(TAG, " vwidth:" + vwidth + " vheight:" + vheight);
     }
 
     @Override
