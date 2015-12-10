@@ -32,33 +32,31 @@ public class RangeSeekBar extends View {
     private static final int[] STATE_PRESSED = {
             android.R.attr.state_pressed, android.R.attr.state_window_focused,
     };
-    private Drawable hasScrollBarBg;        //滑动条滑动后背景图
-    private Drawable notScrollBarBg;        //滑动条未滑动背景图
-    private Drawable mThumbLow;         //前滑块
-    private Drawable mThumbHigh;        //后滑块
+    private Drawable leftScrollBarBg;        //left scroll bar background
+    private Drawable rightScrollBarBg;        //right scroll bar background
+    private Drawable mThumbLow;         //low slider
+    private Drawable mThumbHigh;        //high slider
 
-    private int mScollBarWidth;     //控件宽度=滑动条宽度+滑动块宽度
-    private int mScollBarHeight;    //滑动条高度
+    private int mScollBarWidth;     //scroll width
+    private int mScollBarHeight;    //scroll high
 
-    private int mThumbWidth;        //滑动块宽度
-    private int mThumbHeight;       //滑动块高度
+    private int mThumbWidth;        //slider original width
+    private int mThumbHeight;       //slider original height
 
-    private int thumbWidth;        //滑动块宽度
-    private int thumbHeight;       //滑动块高度
+    private int thumbWidth;         //slider zoom width
+    private int thumbHeight;        //slider zoom height
 
-    private double mOffsetLow = 0;     //前滑块中心坐标
-    private double mOffsetHigh = 0;    //后滑块中心坐标
-    private int mDistance = 0;      //总刻度是固定距离 两边各去掉半个滑块距离
-
-    private int mThumbMarginTop = 0;   //滑动块顶部距离上边框距离，也就是距离字体顶部的距离
+    private double mOffsetLow = 0;     //low slider center coordinate
+    private double mOffsetHigh = 0;    //high slider center coordinate
+    private int mDistance = 0;      //total distance
 
     private int mFlag = CLICK_INVAILD;
     private OnSeekBarChangeListener mBarChangeListener;
 
-    private double defaultScreenLow = 0;    //默认前滑块位置百分比
-    private double defaultScreenHigh = 100;  //默认后滑块位置百分比
+    private double defaultScreenLow = 0;    //default low slider percentage
+    private double defaultScreenHigh = 100;  //default high slider percentage
 
-    private boolean isEdit = false;     //输入框是否正在输入
+    private boolean isEdit = false;
 
     public RangeSeekBar(Context context) {
         this(context, null);
@@ -73,16 +71,16 @@ public class RangeSeekBar extends View {
 //        this.setBackgroundColor(Color.BLACK);
 
         Resources resources = getResources();
-        notScrollBarBg = resources.getDrawable(R.drawable.normal_bg);//normal_bg
-        hasScrollBarBg = resources.getDrawable(R.drawable.progress_bg);//progress_bg
+        leftScrollBarBg = resources.getDrawable(R.drawable.progress_bg);//normal_bg
+        rightScrollBarBg = resources.getDrawable(R.drawable.progress_bg);//progress_bg
         mThumbLow = resources.getDrawable(R.drawable.trim_left);
         mThumbHigh = resources.getDrawable(R.drawable.trim_right);
 
         mThumbLow.setState(STATE_NORMAL);
         mThumbHigh.setState(STATE_NORMAL);
 
-        mScollBarWidth = notScrollBarBg.getIntrinsicWidth();
-        mScollBarHeight = notScrollBarBg.getIntrinsicHeight();
+        mScollBarWidth = leftScrollBarBg.getIntrinsicWidth();
+        mScollBarHeight = leftScrollBarBg.getIntrinsicHeight();
 
         mThumbWidth = mThumbLow.getIntrinsicWidth();
         mThumbHeight = mThumbLow.getIntrinsicHeight();
@@ -91,24 +89,12 @@ public class RangeSeekBar extends View {
         Log.d(TAG, "mThumbWidth:" + mThumbWidth + " mThumbHeight:" + mThumbHeight);
     }
 
-    //默认执行，计算view的宽高,在onDraw()之前
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = measureWidth(widthMeasureSpec);
         int height = measureHeight(heightMeasureSpec);
         Log.d(TAG, "width:" + width + " height:" + height);
-//        int width = widthMeasureSpec;
-//        int height = heightMeasureSpec;
-        mScollBarWidth = width;
-        mScollBarHeight = height;
-        mOffsetHigh = width - mThumbWidth / 2;
-        mOffsetLow = mThumbWidth / 2;
-        mDistance = width - mThumbWidth;
-
-        mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance )) + mThumbWidth / 2;
-        mOffsetHigh = formatDouble(defaultScreenHigh / 100 * (mDistance)) + mThumbWidth / 2;
-        setMeasuredDimension(width, mThumbHeight + mThumbMarginTop+2);
+        setMeasuredDimension(width, height);
     }
-
 
     private int measureWidth(int measureSpec) {
         int specMode = MeasureSpec.getMode(measureSpec);
@@ -117,26 +103,21 @@ public class RangeSeekBar extends View {
         //wrap_content
         if (specMode == MeasureSpec.AT_MOST) {
         }
-        //fill_parent或者精确值
+        //match_parent
         else if (specMode == MeasureSpec.EXACTLY) {
         }
-
         return specSize;
     }
 
     private int measureHeight(int measureSpec) {
         int specMode = MeasureSpec.getMode(measureSpec);
         int specSize = MeasureSpec.getSize(measureSpec);
-        //int defaultHeight = 100;
         //wrap_content
         if (specMode == MeasureSpec.AT_MOST) {
         }
-        //fill_parent或者精确值
+        ////match_parent
         else if (specMode == MeasureSpec.EXACTLY) {
-            //defaultHeight = specSize;
         }
-
-        //return defaultHeight;
         return specSize;
     }
 
@@ -147,6 +128,12 @@ public class RangeSeekBar extends View {
         mThumbHeight = vheight;
         mThumbWidth = (thumbWidth * vheight)/thumbHeight;
         Log.d(TAG, " vwidth:" + vwidth + " vheight:" + vheight);
+        mScollBarWidth = vwidth;
+        mScollBarHeight = vheight;
+        mDistance = vwidth - mThumbWidth;
+
+        mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance )) + mThumbWidth / 2;
+        mOffsetHigh = formatDouble(defaultScreenHigh / 100 * (mDistance)) + mThumbWidth / 2;
     }
 
     @Override
@@ -158,31 +145,24 @@ public class RangeSeekBar extends View {
         text_Paint.setColor(Color.RED);
         text_Paint.setTextSize(20);
 
-        int aaa = 0;//mThumbMarginTop + mThumbHeight / 2 - mScollBarHeight / 2;
-        int bbb = aaa + mScollBarHeight;
+        //leftScroll
+        leftScrollBarBg.setBounds(0, 0, (int)mOffsetLow - mThumbWidth / 2, mScollBarHeight);
+        leftScrollBarBg.draw(canvas);
 
-        //白色，不会动
-        notScrollBarBg.setBounds(mThumbWidth / 2, aaa, mScollBarWidth - mThumbWidth / 2, bbb);
-        notScrollBarBg.draw(canvas);
+        //rightScoll
+        rightScrollBarBg.setBounds((int)mOffsetHigh + mThumbWidth / 2, 0, mScollBarWidth, mScollBarHeight);
+        rightScrollBarBg.draw(canvas);
 
-        //蓝色，中间部分会动
-        hasScrollBarBg.setBounds((int)mOffsetLow, aaa, (int)mOffsetHigh, bbb);
-        hasScrollBarBg.draw(canvas);
-
-        //前滑块
-        mThumbLow.setBounds((int)(mOffsetLow - mThumbWidth / 2), mThumbMarginTop, (int)(mOffsetLow + mThumbWidth / 2), mThumbHeight + mThumbMarginTop);
+        //lowSlider
+        mThumbLow.setBounds((int)(mOffsetLow - mThumbWidth / 2), 0, (int)(mOffsetLow + mThumbWidth / 2), mThumbHeight);
         mThumbLow.draw(canvas);
 
-        //后滑块
-        mThumbHigh.setBounds((int)(mOffsetHigh - mThumbWidth / 2), mThumbMarginTop, (int)(mOffsetHigh + mThumbWidth / 2), mThumbHeight + mThumbMarginTop);
+        //highSlider
+        mThumbHigh.setBounds((int)(mOffsetHigh - mThumbWidth / 2), 0, (int)(mOffsetHigh + mThumbWidth / 2), mThumbHeight);
         mThumbHigh.draw(canvas);
 
-//        double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
-//        double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
-        Log.d(TAG, "123");
-        double progressLow = formatDouble((mOffsetLow) * 100 / mDistance);
-        Log.d(TAG, "234");
-        double progressHigh = formatDouble((mOffsetHigh) * 100 / mDistance);
+        double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
+        double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
         Log.d(TAG, "onDraw-->mOffsetLow: " + mOffsetLow + "  mOffsetHigh: " + mOffsetHigh   + "  progressLow: " + progressLow + "  progressHigh: " + progressHigh);
         canvas.drawText((int) progressLow + "", (int)mOffsetLow - 2 - 2, 15, text_Paint);
         canvas.drawText((int) progressHigh + "", (int)mOffsetHigh - 2, 15, text_Paint);
@@ -197,7 +177,7 @@ public class RangeSeekBar extends View {
 
     @Override
     public boolean onTouchEvent(MotionEvent e) {
-        //按下
+        //press down
         if (e.getAction() == MotionEvent.ACTION_DOWN) {
             if (mBarChangeListener != null) {
                 mBarChangeListener.onProgressBefore();
@@ -212,7 +192,6 @@ public class RangeSeekBar extends View {
                 mThumbHigh.setState(STATE_PRESSED);
             } else if (mFlag == CLICK_IN_LOW_AREA) {
                 mThumbLow.setState(STATE_PRESSED);
-                //如果点击0-mThumbWidth/2坐标
                 if (e.getX() < 0 || e.getX() <= mThumbWidth/2) {
                     mOffsetLow = mThumbWidth/2;
                 } else if (e.getX() > mScollBarWidth - mThumbWidth/2) {
@@ -243,10 +222,10 @@ public class RangeSeekBar extends View {
 //                    }
                 }
             }
-            //设置进度条
+            //set progress bar
             refresh();
 
-            //移动move
+            //move
         } else if (e.getAction() == MotionEvent.ACTION_MOVE) {
 //            Log.d("ACTION_MOVE", "------------------");
             if (mFlag == CLICK_ON_LOW) {
@@ -274,9 +253,9 @@ public class RangeSeekBar extends View {
                     }
                 }
             }
-            //设置进度条
+            //set progress bar
             refresh();
-            //抬起
+            //press up
         } else if (e.getAction() == MotionEvent.ACTION_UP) {
 //            Log.d("ACTION_UP", "------------------");
             mThumbLow.setState(STATE_NORMAL);
@@ -309,8 +288,8 @@ public class RangeSeekBar extends View {
 
     public int getAreaFlag(MotionEvent e) {
 
-        int top = mThumbMarginTop;
-        int bottom = mThumbHeight + mThumbMarginTop;
+        int top = 0;
+        int bottom = mThumbHeight;
         if (e.getY() >= top && e.getY() <= bottom && e.getX() >= (mOffsetLow - mThumbWidth / 2) && e.getX() <= mOffsetLow + mThumbWidth / 2) {
             return CLICK_ON_LOW;
         } else if (e.getY() >= top && e.getY() <= bottom && e.getX() >= (mOffsetHigh - mThumbWidth / 2) && e.getX() <= (mOffsetHigh + mThumbWidth / 2)) {
@@ -332,12 +311,12 @@ public class RangeSeekBar extends View {
         }
     }
 
-    //更新滑块
+    //update slider
     private void refresh() {
         invalidate();
     }
 
-    //设置前滑块的值
+    //set low slider position
     public void setProgressLow(double  progressLow) {
         this.defaultScreenLow = progressLow;
         mOffsetLow = formatDouble(progressLow / 100 * (mDistance ))+ mThumbWidth / 2;
@@ -345,7 +324,7 @@ public class RangeSeekBar extends View {
         refresh();
     }
 
-    //设置后滑块的值
+    //set high slider position
     public void setProgressHigh(double  progressHigh) {
         this.defaultScreenHigh = progressHigh;
         mOffsetHigh = formatDouble(progressHigh / 100 * (mDistance)) + mThumbWidth / 2;
