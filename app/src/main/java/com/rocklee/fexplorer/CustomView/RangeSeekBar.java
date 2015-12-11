@@ -36,6 +36,8 @@ public class RangeSeekBar extends View {
     private Drawable rightScrollBarBg;        //right scroll bar background
     private Drawable mThumbLow;         //low slider
     private Drawable mThumbHigh;        //high slider
+    private Drawable mThumbLowLimit;         //low slider limit
+    private Drawable mThumbHighLimit;        //high slider limit
 
     private int mScollBarWidth;     //scroll width
     private int mScollBarHeight;    //scroll high
@@ -53,10 +55,12 @@ public class RangeSeekBar extends View {
     private int mFlag = CLICK_INVAILD;
     private OnSeekBarChangeListener mBarChangeListener;
 
-    private double defaultScreenLow = 0;    //default low slider percentage
-    private double defaultScreenHigh = 100;  //default high slider percentage
+    private double minDistance;//min scroll range percentage,whole scroll percentage is 100
+    private double maxDistance;//max scroll range percentage,whole scroll percentage is 100
+
 
     private boolean isEdit = false;
+    private boolean isOutOfRange = false;
 
     public RangeSeekBar(Context context) {
         this(context, null);
@@ -75,9 +79,13 @@ public class RangeSeekBar extends View {
         rightScrollBarBg = resources.getDrawable(R.drawable.progress_bg);//progress_bg
         mThumbLow = resources.getDrawable(R.drawable.trim_left);
         mThumbHigh = resources.getDrawable(R.drawable.trim_right);
+        mThumbLowLimit = resources.getDrawable(R.drawable.trim_left_limit);
+        mThumbHighLimit = resources.getDrawable(R.drawable.trim_right_limit);
 
         mThumbLow.setState(STATE_NORMAL);
         mThumbHigh.setState(STATE_NORMAL);
+        mThumbLowLimit.setState(STATE_NORMAL);
+        mThumbHighLimit.setState(STATE_NORMAL);
 
         mScollBarWidth = leftScrollBarBg.getIntrinsicWidth();
         mScollBarHeight = leftScrollBarBg.getIntrinsicHeight();
@@ -132,8 +140,13 @@ public class RangeSeekBar extends View {
         mScollBarHeight = vheight;
         mDistance = vwidth - mThumbWidth;
 
-        mOffsetLow = formatDouble(defaultScreenLow / 100 * (mDistance )) + mThumbWidth / 2;
-        mOffsetHigh = formatDouble(defaultScreenHigh / 100 * (mDistance)) + mThumbWidth / 2;
+        minDistance = formatDouble(mDistance * (10 * 1.0/100)) + mThumbWidth / 2;
+        maxDistance = formatDouble(mDistance * (80 * 1.0/100)) + mThumbWidth / 2;
+        mOffsetLow = formatDouble(mDistance * (0 * 1.0/100)) + mThumbWidth / 2;
+        mOffsetHigh = formatDouble(mDistance * (60 * 1.0/100)) + mThumbWidth / 2;
+        Log.d(TAG, "mDistance:" + mDistance +
+                " minDistance:" + minDistance + " maxDistance" + maxDistance +
+                " mOffsetLow:" + mOffsetLow + " mOffsetHigh:" + mOffsetHigh);
     }
 
     @Override
@@ -145,27 +158,48 @@ public class RangeSeekBar extends View {
         text_Paint.setColor(Color.RED);
         text_Paint.setTextSize(20);
 
+        Paint topFrame = new Paint();
+        Paint bottomFrame = new Paint();
+        topFrame.setStrokeWidth(14.0f);
+        bottomFrame.setStrokeWidth(14.0f);
+
+        //lowSlider
+        mThumbLow.setBounds((int) (mOffsetLow - mThumbWidth / 2), 0, (int) (mOffsetLow + mThumbWidth / 2), mThumbHeight);
+
+        mThumbLowLimit.setBounds((int) (mOffsetLow - mThumbWidth / 2), 0, (int) (mOffsetLow + mThumbWidth / 2), mThumbHeight);
+
         //leftScroll
-        leftScrollBarBg.setBounds(0, 0, (int)mOffsetLow - mThumbWidth / 2, mScollBarHeight);
+        leftScrollBarBg.setBounds(0, 0, (int) mOffsetLow - mThumbWidth / 2, mScollBarHeight);
         leftScrollBarBg.draw(canvas);
+
+        //highSlider
+        mThumbHigh.setBounds((int) (mOffsetHigh - mThumbWidth / 2), 0, (int) (mOffsetHigh + mThumbWidth / 2), mThumbHeight);
+
+        mThumbHighLimit.setBounds((int) (mOffsetHigh - mThumbWidth / 2), 0, (int) (mOffsetHigh + mThumbWidth / 2), mThumbHeight);
+
+        if (isOutOfRange) {
+            mThumbLowLimit.draw(canvas);
+            mThumbHighLimit.draw(canvas);
+            topFrame.setARGB(0xff, 100, 100, 100);
+            bottomFrame.setARGB(0xff, 100, 100, 100);
+        } else {
+            mThumbLow.draw(canvas);
+            mThumbHigh.draw(canvas);
+            topFrame.setARGB(0xff, 255, 109, 109);
+            bottomFrame.setARGB(0xff, 255, 109, 109);
+        }
 
         //rightScoll
         rightScrollBarBg.setBounds((int)mOffsetHigh + mThumbWidth / 2, 0, mScollBarWidth, mScollBarHeight);
         rightScrollBarBg.draw(canvas);
 
-        //lowSlider
-        mThumbLow.setBounds((int)(mOffsetLow - mThumbWidth / 2), 0, (int)(mOffsetLow + mThumbWidth / 2), mThumbHeight);
-        mThumbLow.draw(canvas);
-
-        //highSlider
-        mThumbHigh.setBounds((int)(mOffsetHigh - mThumbWidth / 2), 0, (int)(mOffsetHigh + mThumbWidth / 2), mThumbHeight);
-        mThumbHigh.draw(canvas);
-
         double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
         double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
         Log.d(TAG, "onDraw-->mOffsetLow: " + mOffsetLow + "  mOffsetHigh: " + mOffsetHigh   + "  progressLow: " + progressLow + "  progressHigh: " + progressHigh);
-        canvas.drawText((int) progressLow + "", (int)mOffsetLow - 2 - 2, 15, text_Paint);
+        canvas.drawText((int) progressLow + "", (int) mOffsetLow - 2 - 2, 15, text_Paint);
         canvas.drawText((int) progressHigh + "", (int)mOffsetHigh - 2, 15, text_Paint);
+        canvas.drawLine((int) mOffsetLow + mThumbWidth / 2, 0, (int) mOffsetHigh - mThumbWidth / 2, 0, topFrame);
+        canvas.drawLine((int) mOffsetLow + mThumbWidth / 2, mScollBarHeight, (int)mOffsetHigh - mThumbWidth / 2, mScollBarHeight, bottomFrame);
 
         if (mBarChangeListener != null) {
             if (!isEdit) {
@@ -188,39 +222,41 @@ public class RangeSeekBar extends View {
 //            Log.d("ACTION_DOWN", "------------------");
             if (mFlag == CLICK_ON_LOW) {
                 mThumbLow.setState(STATE_PRESSED);
+                mThumbLowLimit.setState(STATE_PRESSED);
             } else if (mFlag == CLICK_ON_HIGH) {
                 mThumbHigh.setState(STATE_PRESSED);
+                mThumbHighLimit.setState(STATE_PRESSED);
             } else if (mFlag == CLICK_IN_LOW_AREA) {
-                mThumbLow.setState(STATE_PRESSED);
-                if (e.getX() < 0 || e.getX() <= mThumbWidth/2) {
-                    mOffsetLow = mThumbWidth/2;
-                } else if (e.getX() > mScollBarWidth - mThumbWidth/2) {
-//                    mOffsetLow = mDistance - mDuration;
-                    mOffsetLow = mThumbWidth/2 + mDistance;
-                } else {
-                    mOffsetLow = formatDouble(e.getX());
-//                    if (mOffsetHigh<= mOffsetLow) {
-//                        mOffsetHigh = (mOffsetLow + mDuration <= mDistance) ? (mOffsetLow + mDuration)
-//                                : mDistance;
-//                        mOffsetLow = mOffsetHigh - mDuration;
-//                    }
-                }
+//                mThumbLow.setState(STATE_PRESSED);
+//                if (e.getX() < 0 || e.getX() <= mThumbWidth/2) {
+//                    mOffsetLow = mThumbWidth/2;
+//                } else if (e.getX() > mScollBarWidth - mThumbWidth/2) {
+////                    mOffsetLow = mDistance - mDuration;
+//                    mOffsetLow = mThumbWidth/2 + mDistance;
+//                } else {
+//                    mOffsetLow = formatDouble(e.getX());
+////                    if (mOffsetHigh<= mOffsetLow) {
+////                        mOffsetHigh = (mOffsetLow + mDuration <= mDistance) ? (mOffsetLow + mDuration)
+////                                : mDistance;
+////                        mOffsetLow = mOffsetHigh - mDuration;
+////                    }
+//                }
             } else if (mFlag == CLICK_IN_HIGH_AREA) {
-                mThumbHigh.setState(STATE_PRESSED);
-//                if (e.getX() < mDuration) {
-//                    mOffsetHigh = mDuration;
-//                    mOffsetLow = mOffsetHigh - mDuration;
-//                } else if (e.getX() >= mScollBarWidth - mThumbWidth/2) {
+//                mThumbHigh.setState(STATE_PRESSED);
+////                if (e.getX() < mDuration) {
+////                    mOffsetHigh = mDuration;
+////                    mOffsetLow = mOffsetHigh - mDuration;
+////                } else if (e.getX() >= mScollBarWidth - mThumbWidth/2) {
+////                    mOffsetHigh = mDistance + mThumbWidth/2;
+//                if(e.getX() >= mScollBarWidth - mThumbWidth/2) {
 //                    mOffsetHigh = mDistance + mThumbWidth/2;
-                if(e.getX() >= mScollBarWidth - mThumbWidth/2) {
-                    mOffsetHigh = mDistance + mThumbWidth/2;
-                } else {
-                    mOffsetHigh = formatDouble(e.getX());
-//                    if (mOffsetHigh <= mOffsetLow) {
-//                        mOffsetLow = (mOffsetHigh - mDuration >= 0) ? (mOffsetHigh - mDuration) : 0;
-//                        mOffsetHigh = mOffsetLow + mDuration;
-//                    }
-                }
+//                } else {
+//                    mOffsetHigh = formatDouble(e.getX());
+////                    if (mOffsetHigh <= mOffsetLow) {
+////                        mOffsetLow = (mOffsetHigh - mDuration >= 0) ? (mOffsetHigh - mDuration) : 0;
+////                        mOffsetHigh = mOffsetLow + mDuration;
+////                    }
+//                }
             }
             //set progress bar
             refresh();
@@ -229,27 +265,56 @@ public class RangeSeekBar extends View {
         } else if (e.getAction() == MotionEvent.ACTION_MOVE) {
 //            Log.d("ACTION_MOVE", "------------------");
             if (mFlag == CLICK_ON_LOW) {
-                if (e.getX() < 0 || e.getX() <= mThumbWidth/2) {
-                    mOffsetLow = mThumbWidth/2;
-                } else if (e.getX() >= mScollBarWidth - mThumbWidth/2) {
-                    mOffsetLow = mThumbWidth/2 + mDistance;
-                    mOffsetHigh = mOffsetLow;
-                } else {
-                    mOffsetLow = formatDouble(e.getX());
-                    if (mOffsetHigh - mOffsetLow <= 0) {
-                        mOffsetHigh = (mOffsetLow <= mDistance+mThumbWidth/2) ? (mOffsetLow) : (mDistance+mThumbWidth/2);
+                Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetLow);
+                if (e.getX() > mOffsetHigh - mThumbWidth/2 - minDistance){
+                    isOutOfRange = true;
+                    mOffsetLow = mOffsetHigh - mThumbWidth/2 - minDistance;
+                }
+                else {
+                    //when high slider higher than maxDistance
+                    if (mOffsetHigh > maxDistance) {
+                        if ((mOffsetHigh - e.getX()) > maxDistance) {
+                            isOutOfRange = true;
+                            mOffsetLow = mOffsetHigh - maxDistance;
+                        } else {
+                            isOutOfRange = false;
+                            mOffsetLow = formatDouble(e.getX());
+                        }
+                    } else if (mOffsetHigh <= maxDistance) {
+                        if (e.getX() >= 0) {
+                            isOutOfRange = false;
+                            mOffsetLow = formatDouble(e.getX());
+                        }
+                        else {
+                            isOutOfRange = false;
+                            mOffsetLow = mThumbWidth / 2;
+                        }
                     }
                 }
             } else if (mFlag == CLICK_ON_HIGH) {
-                if (e.getX() <  mThumbWidth/2) {
-                    mOffsetHigh = mThumbWidth/2;
-                    mOffsetLow = mThumbWidth/2;
-                } else if (e.getX() > mScollBarWidth - mThumbWidth/2) {
-                    mOffsetHigh = mThumbWidth/2 + mDistance;
-                } else {
-                    mOffsetHigh = formatDouble(e.getX());
-                    if (mOffsetHigh - mOffsetLow <= 0) {
-                        mOffsetLow = (mOffsetHigh >= mThumbWidth/2) ? (mOffsetHigh) : mThumbWidth/2;
+                Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetHigh);
+                if (e.getX() < mOffsetLow + mThumbWidth/2 + minDistance) {
+                    isOutOfRange = true;
+                    mOffsetHigh = mOffsetLow + mThumbWidth / 2 + minDistance;
+                }
+                else {
+                    if (mOffsetLow < mDistance - maxDistance ) {
+                        if (e.getX() - mOffsetLow > maxDistance) {
+                            isOutOfRange = true;
+                            mOffsetHigh = mOffsetLow + maxDistance;
+                        } else {
+                            isOutOfRange = false;
+                            mOffsetHigh = formatDouble(e.getX());
+                        }
+                    } else if (mOffsetLow >= mDistance - maxDistance) {
+                        if (e.getX() <= mScollBarWidth - mThumbWidth/2) {
+                            isOutOfRange = false;
+                            mOffsetHigh = formatDouble(e.getX());
+                        }
+                        else {
+                            isOutOfRange = false;
+                            mOffsetHigh = mThumbWidth / 2 + mDistance;
+                        }
                     }
                 }
             }
@@ -260,6 +325,8 @@ public class RangeSeekBar extends View {
 //            Log.d("ACTION_UP", "------------------");
             mThumbLow.setState(STATE_NORMAL);
             mThumbHigh.setState(STATE_NORMAL);
+            mThumbLowLimit.setState(STATE_NORMAL);
+            mThumbHighLimit.setState(STATE_NORMAL);
 
             if (mBarChangeListener != null) {
                 mBarChangeListener.onProgressAfter();
@@ -318,18 +385,18 @@ public class RangeSeekBar extends View {
 
     //set low slider position
     public void setProgressLow(double  progressLow) {
-        this.defaultScreenLow = progressLow;
-        mOffsetLow = formatDouble(progressLow / 100 * (mDistance ))+ mThumbWidth / 2;
-        isEdit = true;
-        refresh();
+//        this.defaultScreenLow = progressLow;
+//        mOffsetLow = formatDouble(progressLow / 100 * (mDistance ))+ mThumbWidth / 2;
+//        isEdit = true;
+//        refresh();
     }
 
     //set high slider position
     public void setProgressHigh(double  progressHigh) {
-        this.defaultScreenHigh = progressHigh;
-        mOffsetHigh = formatDouble(progressHigh / 100 * (mDistance)) + mThumbWidth / 2;
-        isEdit = true;
-        refresh();
+//        this.defaultScreenHigh = progressHigh;
+//        mOffsetHigh = formatDouble(progressHigh / 100 * (mDistance)) + mThumbWidth / 2;
+//        isEdit = true;
+//        refresh();
     }
 
     public void setOnSeekBarChangeListener(OnSeekBarChangeListener mListener) {
@@ -361,5 +428,12 @@ public class RangeSeekBar extends View {
         BigDecimal bd1 = bd.setScale(2, BigDecimal.ROUND_HALF_UP);
         pDouble = bd1.doubleValue();
         return pDouble;
+    }
+
+    public synchronized void setMinMaxRange(double min, double max) {
+        minDistance = formatDouble(mDistance * (min/100)) + mThumbWidth / 2;
+        maxDistance = formatDouble(mDistance * (max/100)) + mThumbWidth / 2;
+        isEdit = true;
+        refresh();
     }
 }
