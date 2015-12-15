@@ -1,6 +1,7 @@
 package com.rocklee.fexplorer;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -44,6 +45,7 @@ public class VideoPlayerActivity extends Activity {
     private final static int UPDATE_CURRENT_TIME = 0;
     private final static int LOAD_PHOTO = 1;
     private final static int UPDATE_PLAY_STATE = 2;
+    private final static int CLIP_OK = 3;
     //In a sequence the max video duration is 50000000us
     private final static long MAX_SEQUENCE_LENGTH = 50000000;
     //A sequence should have 7 image
@@ -55,15 +57,16 @@ public class VideoPlayerActivity extends Activity {
     private SurfaceView surfaceView;
     private SurfaceHolder surfaceHolder;
     private RelativeLayout myCtlPanel, myTrimPanel, myRangeSeekBar;
-    private TextView current_time,total_time;
+    private TextView current_time,total_time, trimButton;
     private ImageView[] imageView_list = new ImageView[IMAGE_LIST];
     private int[] image_id = {R.id.image_1, R.id.image_2, R.id.image_3, R.id.image_4,
             R.id.image_5, R.id.image_6, R.id.image_7};
     //false means bitmap can not use, true means bitmap is buffer ok, can be used.
     private Bitmap[] bitmap_list = new Bitmap[IMAGE_LIST];
     private Bitmap[] temp_list = new Bitmap[IMAGE_LIST];
-    private ImageView playbackPreview, trimLeftButton, trimRightButton;
+    private ImageView playbackPreview;//, trimLeftButton, trimRightButton;
     private RangeSeekBar rangeSeekBar;
+    private ProgressDialog waitingDialog;
 
 
     private MediaPlayer mediaPlayer = null;
@@ -74,13 +77,14 @@ public class VideoPlayerActivity extends Activity {
     private boolean isPlaying = false;//is video playing
     private boolean isTrimPanel = false;
     private boolean isExit = false;
-    private boolean isupdateImageOver = false;
+    private boolean isUpdateImageOver = false;
     private int mSurfaceViewWidth,mSurfaceViewHeight;
     private long sequence_startTime, sequence_duration;
     //0 empty, 1 current, 2 prev, 3 next
     private int temp_list_state = 0;
     private int maxDuration;
     private int mTime;
+    private double lowCursor, highCursor;
 
     private Handler handler = new Handler() {
         public void handleMessage(Message msg) {
@@ -94,8 +98,13 @@ public class VideoPlayerActivity extends Activity {
                     if (msg.arg1 < bitmap_list.length) {
                         imageView_list[msg.arg1].setImageBitmap(bitmap_list[msg.arg1]);
                         if (msg.arg1 == IMAGE_LIST - 1) {
-                            isupdateImageOver = true;
-                            myRangeSeekBar.setVisibility(View.VISIBLE);
+                            isUpdateImageOver = true;
+                            double[] tempRange = convertMinMaxRange(sequence_duration);
+                            rangeSeekBar.setProgressLow(0.0);
+                            rangeSeekBar.setProgressHigh(tempRange[0] + 1);
+                            rangeSeekBar.setStartAndDuration(sequence_startTime, sequence_duration);
+                            rangeSeekBar.setMinMaxRange(tempRange[0], tempRange[1]);
+                            rangeSeekBar.setVisibility(View.VISIBLE);
                         }
                     }
                     break;
@@ -107,6 +116,10 @@ public class VideoPlayerActivity extends Activity {
                         playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.pause_bg));
                         mediaPlayer.start();
                     }
+                    break;
+                case CLIP_OK:
+                    waitingDialog.dismiss();
+                    break;
                 default:
                     break;
             }
@@ -166,91 +179,196 @@ public class VideoPlayerActivity extends Activity {
             imageView_list[i] = (ImageView) findViewById(image_id[i]);
         }
         //third panel
-        myRangeSeekBar = (RelativeLayout) findViewById(R.id.slide_frame);
-        trimLeftButton = (ImageView) findViewById(R.id.left_button);
-        trimLeftButton.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-                        " sequence_duration:" + sequence_duration);
-                if (mediaPlayer.isPlaying()) {
-                    Message message = new Message();
-                    message.what = UPDATE_PLAY_STATE;
-                    handler.sendMessage(message);
-                }
-                long next_sequence_startTime = sequence_startTime;
-                if (next_sequence_startTime - MAX_SEQUENCE_LENGTH < 0)
-                    return false;
-                else {
-                    sequence_startTime -= MAX_SEQUENCE_LENGTH;
-                    sequence_duration = MAX_SEQUENCE_LENGTH;
-                }
-                isupdateImageOver = false;
-                myRangeSeekBar.setVisibility(View.INVISIBLE);
-                for (int i = 0; i < imageView_list.length; i++)
-                    imageView_list[i].setImageBitmap(null);
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        shiftLeft();
-                    }
-                }).start();
-                return true;
-            }
-        });
-        trimRightButton = (ImageView) findViewById(R.id.right_button);
-        trimRightButton.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
-                if (mediaPlayer.isPlaying()) {
-                    Message message = new Message();
-                    message.what = UPDATE_PLAY_STATE;
-                    handler.sendMessage(message);
-                }
-                long prev_sequence_startTime = sequence_startTime;
-                long prev_sequence_duration = sequence_duration;
-                if (prev_sequence_startTime + MAX_SEQUENCE_LENGTH >= (maxDuration * 1000))
-                    return false;
-                else if (prev_sequence_startTime + prev_sequence_duration + MAX_SEQUENCE_LENGTH > (maxDuration * 1000)) {
-                    sequence_startTime += MAX_SEQUENCE_LENGTH;
-                    sequence_duration = (maxDuration * 1000) - (prev_sequence_startTime + prev_sequence_duration);
-                } else {
-                    sequence_startTime += MAX_SEQUENCE_LENGTH;
-                    sequence_duration = MAX_SEQUENCE_LENGTH;
-                }
-                Log.d(TAG, "prev_sequence_startTime:" + prev_sequence_startTime +
-                        " prev_sequence_duration:" + prev_sequence_duration);
-                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-                        " sequence_duration:" + sequence_duration);
-                isupdateImageOver = false;
-                myRangeSeekBar.setVisibility(View.INVISIBLE);
-                for (int i = 0; i < imageView_list.length; i++)
-                    imageView_list[i].setImageBitmap(null);
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        shiftRight();
-                    }
-                }).start();
-                return true;
-            }
-        });
+//        myRangeSeekBar = (RelativeLayout) findViewById(R.id.slide_frame);
+//        trimLeftButton = (ImageView) findViewById(R.id.left_button);
+//        trimLeftButton.setOnLongClickListener(new View.OnLongClickListener() {
+//            @Override
+//            public boolean onLongClick(View v) {
+//                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
+//                        " sequence_duration:" + sequence_duration);
+//                if (mediaPlayer.isPlaying()) {
+//                    Message message = new Message();
+//                    message.what = UPDATE_PLAY_STATE;
+//                    handler.sendMessage(message);
+//                }
+//                long next_sequence_startTime = sequence_startTime;
+//                if (next_sequence_startTime - MAX_SEQUENCE_LENGTH < 0)
+//                    return false;
+//                else {
+//                    sequence_startTime -= MAX_SEQUENCE_LENGTH;
+//                    sequence_duration = MAX_SEQUENCE_LENGTH;
+//                }
+//                isupdateImageOver = false;
+//                myRangeSeekBar.setVisibility(View.INVISIBLE);
+//                for (int i = 0; i < imageView_list.length; i++)
+//                    imageView_list[i].setImageBitmap(null);
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        shiftLeft();
+//                    }
+//                }).start();
+//                return true;
+//            }
+//        });
+//        trimRightButton = (ImageView) findViewById(R.id.right_button);
+//        trimRightButton.setOnLongClickListener(new View.OnLongClickListener() {
+//            @Override
+//            public boolean onLongClick(View v) {
+//                if (mediaPlayer.isPlaying()) {
+//                    Message message = new Message();
+//                    message.what = UPDATE_PLAY_STATE;
+//                    handler.sendMessage(message);
+//                }
+//                long prev_sequence_startTime = sequence_startTime;
+//                long prev_sequence_duration = sequence_duration;
+//                if (prev_sequence_startTime + MAX_SEQUENCE_LENGTH >= (maxDuration * 1000))
+//                    return false;
+//                else if (prev_sequence_startTime + prev_sequence_duration + MAX_SEQUENCE_LENGTH > (maxDuration * 1000)) {
+//                    sequence_startTime += MAX_SEQUENCE_LENGTH;
+//                    sequence_duration = (maxDuration * 1000) - (prev_sequence_startTime + prev_sequence_duration);
+//                } else {
+//                    sequence_startTime += MAX_SEQUENCE_LENGTH;
+//                    sequence_duration = MAX_SEQUENCE_LENGTH;
+//                }
+//                Log.d(TAG, "prev_sequence_startTime:" + prev_sequence_startTime +
+//                        " prev_sequence_duration:" + prev_sequence_duration);
+//                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
+//                        " sequence_duration:" + sequence_duration);
+//                isupdateImageOver = false;
+//                myRangeSeekBar.setVisibility(View.INVISIBLE);
+//                for (int i = 0; i < imageView_list.length; i++)
+//                    imageView_list[i].setImageBitmap(null);
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        shiftRight();
+//                    }
+//                }).start();
+//                return true;
+//            }
+//        });
 
         rangeSeekBar = (RangeSeekBar) findViewById(R.id.range_seekbar);
         rangeSeekBar.setOnSeekBarChangeListener(new RangeSeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressBefore() {
-
             }
 
             @Override
             public void onProgressChanged(RangeSeekBar seekBar, double progressLow, double progressHigh) {
-
+                Log.d(TAG, "progressLow:" + progressLow + " progressHigh:" + progressHigh);
+                lowCursor = progressLow;
+                highCursor = progressHigh;
             }
-
             @Override
             public void onProgressAfter() {
+            }
+        });
 
+        rangeSeekBar.setOnLongClickListener(new View.OnLongClickListener() {
+
+            @Override
+            public boolean onLongClick(View v) {
+                int state = rangeSeekBar.getWhichSliderLongPressed();
+                if (state == 1) {
+                    Log.d(TAG, "sequence_startTime:" + sequence_startTime +
+                            " sequence_duration:" + sequence_duration);
+                    if (mediaPlayer.isPlaying()) {
+                        Message message = new Message();
+                        message.what = UPDATE_PLAY_STATE;
+                        handler.sendMessage(message);
+                    }
+                    long next_sequence_startTime = sequence_startTime;
+                    if (next_sequence_startTime - MAX_SEQUENCE_LENGTH < 0)
+                        return false;
+                    else {
+                        sequence_startTime -= MAX_SEQUENCE_LENGTH;
+                        sequence_duration = MAX_SEQUENCE_LENGTH;
+                    }
+                    isUpdateImageOver = false;
+                    rangeSeekBar.setVisibility(View.INVISIBLE);
+//                    double[] tempRange = convertMinMaxRange(sequence_duration);
+//                    rangeSeekBar.setProgressLow(0.0);
+//                    rangeSeekBar.setProgressHigh(tempRange[0]);
+//                    rangeSeekBar.setMinMaxRange(tempRange[0], tempRange[1]);
+                    for (int i = 0; i < imageView_list.length; i++)
+                        imageView_list[i].setImageBitmap(null);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            shiftLeft();
+                        }
+                    }).start();
+                } else if (state == 2) {
+                    Log.d(TAG, "right");
+                    if (mediaPlayer.isPlaying()) {
+                        Message message = new Message();
+                        message.what = UPDATE_PLAY_STATE;
+                        handler.sendMessage(message);
+                    }
+                    long prev_sequence_startTime = sequence_startTime;
+                    long prev_sequence_duration = sequence_duration;
+                    if (prev_sequence_startTime + MAX_SEQUENCE_LENGTH >= (maxDuration * 1000))
+                        return false;
+                    else if (prev_sequence_startTime + prev_sequence_duration + MAX_SEQUENCE_LENGTH > (maxDuration * 1000)) {
+                        sequence_startTime += MAX_SEQUENCE_LENGTH;
+                        sequence_duration = (maxDuration * 1000) - (prev_sequence_startTime + prev_sequence_duration);
+                    } else {
+                        sequence_startTime += MAX_SEQUENCE_LENGTH;
+                        sequence_duration = MAX_SEQUENCE_LENGTH;
+                    }
+                    Log.d(TAG, "prev_sequence_startTime:" + prev_sequence_startTime +
+                            " prev_sequence_duration:" + prev_sequence_duration);
+                    Log.d(TAG, "sequence_startTime:" + sequence_startTime +
+                            " sequence_duration:" + sequence_duration);
+                    isUpdateImageOver = false;
+                    rangeSeekBar.setVisibility(View.INVISIBLE);
+//                    double[] tempRange = convertMinMaxRange(sequence_duration);
+//                    rangeSeekBar.setProgressLow(0.0);
+//                    rangeSeekBar.setProgressHigh(tempRange[0]);
+//                    rangeSeekBar.setMinMaxRange(tempRange[0], tempRange[1]);
+                    for (int i = 0; i < imageView_list.length; i++)
+                        imageView_list[i].setImageBitmap(null);
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            shiftRight();
+                        }
+                    }).start();
+                }
+                return false;
+            }
+        });
+
+        trimButton = (TextView) findViewById(R.id.trim);
+        trimButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!isUpdateImageOver)
+                    return;
+                waitingDialog = new ProgressDialog(VideoPlayerActivity.this);
+                waitingDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+                waitingDialog.setCancelable(false);
+                waitingDialog.setCanceledOnTouchOutside(false);
+                waitingDialog.setMessage("Saving...");
+                waitingDialog.show();
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        double[] tempCursor = rangeSeekBar.getLowHighCursor();
+                        long[] tempClipTime = CalculateClipTime(tempCursor[0],
+                                tempCursor[1],
+                                sequence_startTime,
+                                sequence_duration);
+                        VideoDecoder videoDecoder = new VideoDecoder();
+                        if (videoDecoder.decodeVideo(videoPath, tempClipTime[0], tempClipTime[1])) {
+                            Message message = new Message();
+                            message.what = CLIP_OK;
+                            handler.sendMessage(message);
+                        }
+                    }
+                }).start();
             }
         });
     }
@@ -442,14 +560,14 @@ public class VideoPlayerActivity extends Activity {
                     }
                 };
                 mTimer.schedule(mTimerTask, 0, 500);
+                sequence_startTime = 0;
+                if (maxDuration > MAX_SEQUENCE_LENGTH/1000)
+                    sequence_duration = MAX_SEQUENCE_LENGTH;
+                else
+                    sequence_duration = (long)(maxDuration*1000);
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        sequence_startTime = 0;
-                        if (maxDuration > MAX_SEQUENCE_LENGTH/1000)
-                            sequence_duration = MAX_SEQUENCE_LENGTH;
-                        else
-                            sequence_duration = (long)(maxDuration*1000);
                         firstGetImage();
                     }
                 }).start();
@@ -459,7 +577,7 @@ public class VideoPlayerActivity extends Activity {
                         while (true) {
                             if (isExit)
                                 break;
-                            if (mediaPlayer.isPlaying() && isupdateImageOver) {
+                            if (mediaPlayer.isPlaying() && isUpdateImageOver) {
                                 if (mediaPlayer.getCurrentPosition() * 1000 >= sequence_startTime + sequence_duration) {
                                     Message message = new Message();
                                     message.what = UPDATE_PLAY_STATE;
@@ -498,6 +616,13 @@ public class VideoPlayerActivity extends Activity {
 
     public int getTime() {
         return mTime;
+    }
+
+    public double[] convertMinMaxRange(long duration) {
+        double[] minMax = {0.0, 0.0};
+        minMax[0] = (5 * 100 * 1.0)/(duration * 1.0/1000000);//min time
+        minMax[1] = (40 * 100 * 1.0)/(duration * 1.0/1000000);//max time
+        return minMax;
     }
 
     private Bitmap compressImage(Bitmap image) {
@@ -607,5 +732,19 @@ public class VideoPlayerActivity extends Activity {
             getImageFromVideo();
             temp_list_state = 3;
         }
+    }
+    //the max cursor is 100%
+    public long[] CalculateClipTime(double startCursor,
+                                    double endCursor,
+                                    long startTime,
+                                    long duration) {
+        Log.d(TAG,"startCursor" + startCursor + "endCursor" + endCursor);
+        Log.d(TAG,"startTime" + startTime + "duration" + duration);
+        long[] clipTime = {0,0};
+        clipTime[0] = startTime + (long)((duration * 1.0) * startCursor)/100;
+        clipTime[1] = startTime + (long)((duration * 1.0) * endCursor)/100;
+        clipTime[1] = clipTime[1] - clipTime[0];
+        Log.d(TAG,"clipTime[0]" + clipTime[0] + "clipTime[1]" + clipTime[1]);
+        return clipTime;
     }
 }

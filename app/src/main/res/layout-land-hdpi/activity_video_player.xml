@@ -159,7 +159,7 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="visible"
+        android:visibility="invisible"
         android:id="@+id/trim_panel"
         android:orientation="vertical">
 
@@ -278,26 +278,26 @@
 
                 </LinearLayout>
 
-                <RelativeLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:id="@+id/slide_frame"
-                    android:visibility="invisible">
+                <!--<RelativeLayout-->
+                    <!--android:layout_width="match_parent"-->
+                    <!--android:layout_height="match_parent"-->
+                    <!--android:id="@+id/slide_frame"-->
+                    <!--android:visibility="invisible">-->
 
-                    <ImageView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:id="@+id/left_button"
-                        android:src="@drawable/trim_left"/>
+                    <!--<ImageView-->
+                        <!--android:layout_width="wrap_content"-->
+                        <!--android:layout_height="wrap_content"-->
+                        <!--android:id="@+id/left_button"-->
+                        <!--android:src="@drawable/trim_left"/>-->
 
-                    <ImageView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:id="@+id/right_button"
-                        android:src="@drawable/trim_right"
-                        android:layout_alignParentTop="false"
-                        android:layout_alignParentEnd="true" />
-                </RelativeLayout>
+                    <!--<ImageView-->
+                        <!--android:layout_width="wrap_content"-->
+                        <!--android:layout_height="wrap_content"-->
+                        <!--android:id="@+id/right_button"-->
+                        <!--android:src="@drawable/trim_right"-->
+                        <!--android:layout_alignParentTop="false"-->
+                        <!--android:layout_alignParentEnd="true" />-->
+                <!--</RelativeLayout>-->
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -306,6 +306,7 @@
                     <com.rocklee.fexplorer.CustomView.RangeSeekBar
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:visibility="invisible"
                         android:id="@+id/range_seekbar"/>
 
                 </LinearLayout>
