@@ -51,7 +51,7 @@ public class VideoDecoder {
             MediaFormat.KEY_OPERATING_RATE, MediaFormat.KEY_BITRATE_MODE,
             MediaFormat.KEY_AUDIO_SESSION_ID};
 
-    public boolean decodeVideo(String url, long clipPoint, long clipDuration) {
+    public boolean decodeVideo(String inputFile, String outputFile, long clipPoint, long clipDuration) {
         //MediaMetadataRetriever
         int videoTrackIndex = -1;
         int audioTrackIndex = -1;
@@ -60,12 +60,12 @@ public class VideoDecoder {
         int sourceVTrack = 0;
         int sourceATrack = 0;
         long videoDuration, audioDuration;
-        String videoPhoto = url.substring(0, url.lastIndexOf(".")) + "_photo.png";
+        String videoPhoto = inputFile.substring(0, inputFile.lastIndexOf(".")) + "_photo.png";
         //saveBitmap(videoPhoto, getVideoThumbnail(url, 180, 180, MediaStore.Video.Thumbnails.MINI_KIND));
         mediaExtractor = new MediaExtractor();
         try {
-            mediaExtractor.setDataSource(url);
-            mediaMuxer = new MediaMuxer(url.substring(0, url.lastIndexOf(".")) + "_output.mp4", OutputFormat.MUXER_OUTPUT_MPEG_4);
+            mediaExtractor.setDataSource(inputFile);
+            mediaMuxer = new MediaMuxer(outputFile, OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (Exception e) {
             Log.e(TAG, "error path" + e.getMessage());
         }
@@ -250,10 +250,8 @@ public class VideoDecoder {
         Bitmap bitmap = null;
         BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
-        // 获取这个图片的宽和高，注意此处的bitmap为null
         bitmap = BitmapFactory.decodeFile(imagePath, options);
         options.inJustDecodeBounds = false; // 设为 false
-        // 计算缩放比
         int h = options.outHeight;
         int w = options.outWidth;
         int beWidth = w / width;
@@ -268,9 +266,7 @@ public class VideoDecoder {
             be = 1;
         }
         options.inSampleSize = be;
-        // 重新读入图片，读取缩放后的bitmap，注意这次要把options.inJustDecodeBounds 设为 false
         bitmap = BitmapFactory.decodeFile(imagePath, options);
-        // 利用ThumbnailUtils来创建缩略图，这里要指定要缩放哪个Bitmap对象
         bitmap = ThumbnailUtils.extractThumbnail(bitmap, width, height,
                 ThumbnailUtils.OPTIONS_RECYCLE_INPUT);
         return bitmap;
@@ -279,7 +275,6 @@ public class VideoDecoder {
     private Bitmap getVideoThumbnail(String videoPath, int width, int height,
                                      int kind) {
         Bitmap bitmap = null;
-        // 获取视频的缩略图
         bitmap = ThumbnailUtils.createVideoThumbnail(videoPath, kind);
         System.out.println("w"+bitmap.getWidth());
         System.out.println("h"+bitmap.getHeight());
@@ -307,7 +302,7 @@ public class VideoDecoder {
                 reBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
                 out.flush();
                 out.close();
-                Log.i(TAG, "已经保存");
+                Log.i(TAG, "already save");
             } else
                 Log.e(TAG, "bitmap error");
         } catch (FileNotFoundException e) {
