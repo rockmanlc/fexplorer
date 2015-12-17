@@ -354,6 +354,7 @@ public class VideoPlayerActivity extends Activity {
                         myTrimPanel.setVisibility(View.INVISIBLE);
                         myCtlPanel.setVisibility(View.VISIBLE);
                         isTrimPanel = false;
+                        playbackPreview.setImageDrawable(getResources().getDrawable(R.drawable.play_bg));
                         mediaPlayer.pause();
                         isPlaying = false;
                     }
