@@ -19,9 +19,7 @@ import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
-import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
@@ -35,7 +33,6 @@ import com.rocklee.fexplorer.Decoder.VideoDecoder;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -179,76 +176,6 @@ public class VideoPlayerActivity extends Activity {
             imageView_list[i] = (ImageView) findViewById(image_id[i]);
         }
         //third panel
-//        myRangeSeekBar = (RelativeLayout) findViewById(R.id.slide_frame);
-//        trimLeftButton = (ImageView) findViewById(R.id.left_button);
-//        trimLeftButton.setOnLongClickListener(new View.OnLongClickListener() {
-//            @Override
-//            public boolean onLongClick(View v) {
-//                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-//                        " sequence_duration:" + sequence_duration);
-//                if (mediaPlayer.isPlaying()) {
-//                    Message message = new Message();
-//                    message.what = UPDATE_PLAY_STATE;
-//                    handler.sendMessage(message);
-//                }
-//                long next_sequence_startTime = sequence_startTime;
-//                if (next_sequence_startTime - MAX_SEQUENCE_LENGTH < 0)
-//                    return false;
-//                else {
-//                    sequence_startTime -= MAX_SEQUENCE_LENGTH;
-//                    sequence_duration = MAX_SEQUENCE_LENGTH;
-//                }
-//                isupdateImageOver = false;
-//                myRangeSeekBar.setVisibility(View.INVISIBLE);
-//                for (int i = 0; i < imageView_list.length; i++)
-//                    imageView_list[i].setImageBitmap(null);
-//                new Thread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        shiftLeft();
-//                    }
-//                }).start();
-//                return true;
-//            }
-//        });
-//        trimRightButton = (ImageView) findViewById(R.id.right_button);
-//        trimRightButton.setOnLongClickListener(new View.OnLongClickListener() {
-//            @Override
-//            public boolean onLongClick(View v) {
-//                if (mediaPlayer.isPlaying()) {
-//                    Message message = new Message();
-//                    message.what = UPDATE_PLAY_STATE;
-//                    handler.sendMessage(message);
-//                }
-//                long prev_sequence_startTime = sequence_startTime;
-//                long prev_sequence_duration = sequence_duration;
-//                if (prev_sequence_startTime + MAX_SEQUENCE_LENGTH >= (maxDuration * 1000))
-//                    return false;
-//                else if (prev_sequence_startTime + prev_sequence_duration + MAX_SEQUENCE_LENGTH > (maxDuration * 1000)) {
-//                    sequence_startTime += MAX_SEQUENCE_LENGTH;
-//                    sequence_duration = (maxDuration * 1000) - (prev_sequence_startTime + prev_sequence_duration);
-//                } else {
-//                    sequence_startTime += MAX_SEQUENCE_LENGTH;
-//                    sequence_duration = MAX_SEQUENCE_LENGTH;
-//                }
-//                Log.d(TAG, "prev_sequence_startTime:" + prev_sequence_startTime +
-//                        " prev_sequence_duration:" + prev_sequence_duration);
-//                Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-//                        " sequence_duration:" + sequence_duration);
-//                isupdateImageOver = false;
-//                myRangeSeekBar.setVisibility(View.INVISIBLE);
-//                for (int i = 0; i < imageView_list.length; i++)
-//                    imageView_list[i].setImageBitmap(null);
-//                new Thread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        shiftRight();
-//                    }
-//                }).start();
-//                return true;
-//            }
-//        });
-
         rangeSeekBar = (RangeSeekBar) findViewById(R.id.range_seekbar);
         rangeSeekBar.setOnSeekBarChangeListener(new RangeSeekBar.OnSeekBarChangeListener() {
             @Override
@@ -261,6 +188,7 @@ public class VideoPlayerActivity extends Activity {
                 lowCursor = progressLow;
                 highCursor = progressHigh;
             }
+
             @Override
             public void onProgressAfter() {
             }
@@ -288,10 +216,6 @@ public class VideoPlayerActivity extends Activity {
                     }
                     isUpdateImageOver = false;
                     rangeSeekBar.setVisibility(View.INVISIBLE);
-//                    double[] tempRange = convertMinMaxRange(sequence_duration);
-//                    rangeSeekBar.setProgressLow(0.0);
-//                    rangeSeekBar.setProgressHigh(tempRange[0]);
-//                    rangeSeekBar.setMinMaxRange(tempRange[0], tempRange[1]);
                     for (int i = 0; i < imageView_list.length; i++)
                         imageView_list[i].setImageBitmap(null);
                     new Thread(new Runnable() {
@@ -300,6 +224,7 @@ public class VideoPlayerActivity extends Activity {
                             shiftLeft();
                         }
                     }).start();
+                    mediaPlayer.seekTo((int)(sequence_startTime/1000));
                 } else if (state == 2) {
                     Log.d(TAG, "right");
                     if (mediaPlayer.isPlaying()) {
@@ -324,10 +249,6 @@ public class VideoPlayerActivity extends Activity {
                             " sequence_duration:" + sequence_duration);
                     isUpdateImageOver = false;
                     rangeSeekBar.setVisibility(View.INVISIBLE);
-//                    double[] tempRange = convertMinMaxRange(sequence_duration);
-//                    rangeSeekBar.setProgressLow(0.0);
-//                    rangeSeekBar.setProgressHigh(tempRange[0]);
-//                    rangeSeekBar.setMinMaxRange(tempRange[0], tempRange[1]);
                     for (int i = 0; i < imageView_list.length; i++)
                         imageView_list[i].setImageBitmap(null);
                     new Thread(new Runnable() {
@@ -336,6 +257,7 @@ public class VideoPlayerActivity extends Activity {
                             shiftRight();
                         }
                     }).start();
+                    mediaPlayer.seekTo((int)(sequence_startTime/1000));
                 }
                 return false;
             }
@@ -361,8 +283,12 @@ public class VideoPlayerActivity extends Activity {
                                 tempCursor[1],
                                 sequence_startTime,
                                 sequence_duration);
+                        String outputPath = videoPath.substring(0, videoPath.lastIndexOf("."))
+                                + "_" + String.format("%04d", (int)(tempClipTime[0]/1000000))
+                                + "_" + String.format("%04d", (int)((tempClipTime[0] + tempClipTime[1])/1000000))
+                                + ".mp4";
                         VideoDecoder videoDecoder = new VideoDecoder();
-                        if (videoDecoder.decodeVideo(videoPath, tempClipTime[0], tempClipTime[1])) {
+                        if (videoDecoder.decodeVideo(videoPath, outputPath, tempClipTime[0], tempClipTime[1])) {
                             Message message = new Message();
                             message.what = CLIP_OK;
                             handler.sendMessage(message);
@@ -444,7 +370,7 @@ public class VideoPlayerActivity extends Activity {
                 videoPlay.setImageDrawable(getResources().getDrawable(R.drawable.play));
                 mediaPlayer.pause();
                 isPlaying = false;
-            } else if (v == playbackPreview) {
+            } else if (v == playbackPreview && isUpdateImageOver) {
                 Message message = new Message();
                 message.what = UPDATE_PLAY_STATE;
                 handler.sendMessage(message);
@@ -628,22 +554,15 @@ public class VideoPlayerActivity extends Activity {
     private Bitmap compressImage(Bitmap image) {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        //质量压缩方法，这里100表示不压缩，把压缩后的数据存放到baos中
         image.compress(Bitmap.CompressFormat.PNG, 0, baos);
         int options = 100;
-        //循环判断如果压缩后图片是否大于100kb,大于继续压缩
 //        while ( baos.toByteArray().length / 1024>100) {
-//            //重置baos即清空baos
 //            baos.reset();
-//            //这里压缩options%，把压缩后的数据存放到baos中
 //            image.compress(Bitmap.CompressFormat.JPEG, options, baos);
-//            //每次都减少10
 //            options -= 10;
 //        }
-        //把压缩后的数据baos存放到ByteArrayInputStream中
         Log.d(TAG,"compress size is :" + baos.toByteArray().length / 1024);
         ByteArrayInputStream isBm = new ByteArrayInputStream(baos.toByteArray());
-        //把ByteArrayInputStream数据生成图片
         Bitmap bitmap = BitmapFactory.decodeStream(isBm, null, null);
         return bitmap;
     }
