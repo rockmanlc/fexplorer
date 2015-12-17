@@ -161,13 +161,11 @@ public class RangeSeekBar extends View {
     }
 
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        Log.d(TAG, "onLayout");
         super.onLayout(changed, l, t, r, b);
         int vwidth = getWidth();
         int vheight = getHeight();
         mThumbHeight = vheight;
         mThumbWidth = (thumbWidth * vheight)/thumbHeight;
-//        Log.d(TAG, " vwidth:" + vwidth + " vheight:" + vheight);
         mScollBarWidth = vwidth;
         mScollBarHeight = vheight;
         mDistance = vwidth - mThumbWidth;
@@ -176,16 +174,11 @@ public class RangeSeekBar extends View {
         maxDistance = formatDouble(mDistance * (80 * 1.0/100));
         mOffsetLow = formatDouble(mDistance * (0 * 1.0/100)) + mThumbWidth / 2;
         mOffsetHigh = formatDouble(mDistance * (59 * 1.0/100)) + mThumbWidth / 2;
-//        Log.d(TAG, "mDistance:" + mDistance +
-//                " minDistance:" + minDistance + " maxDistance" + maxDistance +
-//                " mOffsetLow:" + mOffsetLow + " mOffsetHigh:" + mOffsetHigh);
-
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        //Log.d(TAG, "onDraw" + " mOffsetHigh" + mOffsetHigh);
         Paint text_Paint = new Paint();
         text_Paint.setTextAlign(Paint.Align.CENTER);
         text_Paint.setColor(Color.RED);
@@ -233,9 +226,6 @@ public class RangeSeekBar extends View {
 
         double progressLow = formatDouble((mOffsetLow - mThumbWidth / 2) * 100 / mDistance);
         double progressHigh = formatDouble((mOffsetHigh - mThumbWidth / 2) * 100 / mDistance);
-//        Log.d(TAG, "onDraw-->mOffsetLow: " + mOffsetLow + "  mOffsetHigh: " + mOffsetHigh   + "  progressLow: " + progressLow + "  progressHigh: " + progressHigh);
-//        canvas.drawText((int) progressLow + "", (int) mOffsetLow - 2 - 2, 15, text_Paint);
-//        canvas.drawText((int) progressHigh + "", (int)mOffsetHigh - 2, 15, text_Paint);
         int duration = (int)((durationTime * 1.0) * (progressHigh - progressLow)/100)/1000000;
         canvas.drawText("00:" + String.format("%02d",duration), (int)mOffsetLow + (int)(mOffsetHigh - mOffsetLow)/2, 24, durationText);
         canvas.drawLine((int) mOffsetLow + mThumbWidth / 2, 0, (int) mOffsetHigh - mThumbWidth / 2, 0, topFrame);
@@ -258,7 +248,6 @@ public class RangeSeekBar extends View {
                 isEdit = false;
             }
             mFlag = getAreaFlag(e);
-//            Log.d(TAG, "e.getX: " + e.getX() + "mFlag: " + mFlag);
 //            Log.d("ACTION_DOWN", "------------------");
             if (mFlag == CLICK_ON_LOW) {
                 if ((int)mOffsetLow == mThumbWidth/2) {
@@ -316,7 +305,6 @@ public class RangeSeekBar extends View {
                 mPreOffsetHigh = mOffsetHigh;
                 preXPosition = e.getX();
                 lowHighDistance = mPreOffsetHigh - mPreOffsetLow;
-                Log.d(TAG, "mPreOffsetLow: " + mPreOffsetLow + " mPreOffsetHigh:" + mPreOffsetHigh + " preXPosition:" + preXPosition);
             }
             //set progress bar
             refresh();
@@ -324,7 +312,6 @@ public class RangeSeekBar extends View {
             //move
         } else if (e.getAction() == MotionEvent.ACTION_MOVE) {
 //            Log.d("ACTION_MOVE", "------------------");
-//            Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetLow);
             if (Math.abs(mLastMotionX - (int)e.getX()) > mThumbWidth / 2) {
                 isMoved = true;
             }
@@ -355,7 +342,6 @@ public class RangeSeekBar extends View {
                     }
                 }
             } else if (mFlag == CLICK_ON_HIGH) {
-//                Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetHigh);
                 if (e.getX() < mOffsetLow + minDistance) {
                     isOutOfRange = true;
                     mOffsetHigh = mOffsetLow + minDistance;
@@ -382,7 +368,6 @@ public class RangeSeekBar extends View {
                 }
             } else if (mFlag == CLICK_IN_MIDDLE_AREA) {
                 if (mOffsetLow > mThumbWidth/2 || mOffsetHigh < mScollBarWidth - mThumbWidth/2) {
-                    Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetLow + " mOffsetHigh:" + mOffsetHigh);
                     if (e.getX() < preXPosition) {
                         mOffsetLow = mPreOffsetLow - (preXPosition - e.getX());
                         mOffsetHigh = mPreOffsetHigh - (preXPosition - e.getX());
@@ -406,7 +391,6 @@ public class RangeSeekBar extends View {
             //press up
         } else if (e.getAction() == MotionEvent.ACTION_UP) {
 //            Log.d("ACTION_UP", "------------------");
-
             mThumbLow.setState(STATE_NORMAL);
             mThumbHigh.setState(STATE_NORMAL);
             mThumbLowLimit.setState(STATE_NORMAL);

@@ -68,6 +68,7 @@ public class VideoDecoder {
             mediaMuxer = new MediaMuxer(outputFile, OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (Exception e) {
             Log.e(TAG, "error path" + e.getMessage());
+            return false;
         }
         for (int i = 0; i < mediaExtractor.getTrackCount(); i++) {
             try {
@@ -92,10 +93,10 @@ public class VideoDecoder {
                         Log.e(TAG, "clip duration is error!");
                         return false;
                     }
-                    Log.d(TAG, "width and height is " + width + " " + height
-                                    + ";maxInputSize is " + videoMaxInputSize
-                                    + ";duration is " + videoDuration
-                    );
+//                    Log.d(TAG, "width and height is " + width + " " + height
+//                                    + ";maxInputSize is " + videoMaxInputSize
+//                                    + ";duration is " + videoDuration
+//                    );
                     videoTrackIndex = mediaMuxer.addTrack(mediaFormat);
                 }
                 else if (mime.startsWith("audio/")) {
@@ -108,14 +109,13 @@ public class VideoDecoder {
                     int channelCount = mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
                     audioMaxInputSize = mediaFormat.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE);
                     audioDuration = mediaFormat.getLong(MediaFormat.KEY_DURATION);
-                    Log.d(TAG, "sampleRate is " + sampleRate
-                                    + ";channelCount is " + channelCount
-                                    + ";audioMaxInputSize is " + audioMaxInputSize
-                                    + ";audioDuration is " + audioDuration
-                    );
+//                    Log.d(TAG, "sampleRate is " + sampleRate
+//                                    + ";channelCount is " + channelCount
+//                                    + ";audioMaxInputSize is " + audioMaxInputSize
+//                                    + ";audioDuration is " + audioDuration
+//                    );
                     audioTrackIndex = mediaMuxer.addTrack(mediaFormat);
                 }
-                Log.d(TAG, "file mime is " + mime);
             } catch (Exception e) {
                 Log.e(TAG, " read error " + e.getMessage());
             }
@@ -149,7 +149,6 @@ public class VideoDecoder {
             mediaExtractor.readSampleData(inputBuffer, 0);
             long SecondVideoPTS = mediaExtractor.getSampleTime();
             videoSampleTime = Math.abs(SecondVideoPTS - firstVideoPTS);
-            Log.d(TAG, "videoSampleTime is " + videoSampleTime);
         }
         mediaExtractor.seekTo(clipPoint, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
         int IFrameCount = 0;
@@ -183,10 +182,10 @@ public class VideoDecoder {
 //                saveBitmap(IFramePhoto, bitmap);
 //                IFrameCount++;
             }
-            Log.d(TAG, "trackIndex is " + trackIndex
-                    + ";presentationTimeUs is " + presentationTimeUs
-                    + ";sampleFlag is " + sampleFlag
-                    + ";sampleSize is " + sampleSize);
+//            Log.d(TAG, "trackIndex is " + trackIndex
+//                    + ";presentationTimeUs is " + presentationTimeUs
+//                    + ";sampleFlag is " + sampleFlag
+//                    + ";sampleSize is " + sampleSize);
             if ((clipDuration != 0) && (presentationTimeUs > (clipPoint + clipDuration))) {
                 mediaExtractor.unselectTrack(sourceVTrack);
                 break;
@@ -215,7 +214,6 @@ public class VideoDecoder {
             mediaExtractor.readSampleData(inputBuffer, 0);
             long SecondAudioPTS = mediaExtractor.getSampleTime();
             audioSampleTime = Math.abs(SecondAudioPTS - firstAudioPTS);
-            Log.d(TAG, "AudioSampleTime is " + audioSampleTime);
         }
         mediaExtractor.seekTo(clipPoint, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
         while (true) {
@@ -226,8 +224,8 @@ public class VideoDecoder {
             }
             int trackIndex = mediaExtractor.getSampleTrackIndex();
             long presentationTimeUs = mediaExtractor.getSampleTime();
-            Log.d(TAG, "trackIndex is " + trackIndex
-                    + ";presentationTimeUs is " + presentationTimeUs);
+//            Log.d(TAG, "trackIndex is " + trackIndex
+//                    + ";presentationTimeUs is " + presentationTimeUs);
             if ((clipDuration != 0) && (presentationTimeUs > (clipPoint + clipDuration))) {
                 mediaExtractor.unselectTrack(sourceATrack);
                 break;
@@ -302,7 +300,6 @@ public class VideoDecoder {
                 reBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
                 out.flush();
                 out.close();
-                Log.i(TAG, "already save");
             } else
                 Log.e(TAG, "bitmap error");
         } catch (FileNotFoundException e) {

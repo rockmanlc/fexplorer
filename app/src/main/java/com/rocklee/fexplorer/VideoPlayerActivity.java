@@ -91,7 +91,6 @@ public class VideoPlayerActivity extends Activity {
                     current_time.setText(intTimeToString(getTime()));
                     break;
                 case LOAD_PHOTO :
-                    Log.d(TAG, "bitmap id:" + msg.arg1);
                     if (msg.arg1 < bitmap_list.length) {
                         imageView_list[msg.arg1].setImageBitmap(bitmap_list[msg.arg1]);
                         if (msg.arg1 == IMAGE_LIST - 1) {
@@ -184,7 +183,7 @@ public class VideoPlayerActivity extends Activity {
 
             @Override
             public void onProgressChanged(RangeSeekBar seekBar, double progressLow, double progressHigh) {
-                Log.d(TAG, "progressLow:" + progressLow + " progressHigh:" + progressHigh);
+                //Log.d(TAG, "progressLow:" + progressLow + " progressHigh:" + progressHigh);
                 lowCursor = progressLow;
                 highCursor = progressHigh;
             }
@@ -200,8 +199,6 @@ public class VideoPlayerActivity extends Activity {
             public boolean onLongClick(View v) {
                 int state = rangeSeekBar.getWhichSliderLongPressed();
                 if (state == 1) {
-                    Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-                            " sequence_duration:" + sequence_duration);
                     if (mediaPlayer.isPlaying()) {
                         Message message = new Message();
                         message.what = UPDATE_PLAY_STATE;
@@ -226,7 +223,6 @@ public class VideoPlayerActivity extends Activity {
                     }).start();
                     mediaPlayer.seekTo((int)(sequence_startTime/1000));
                 } else if (state == 2) {
-                    Log.d(TAG, "right");
                     if (mediaPlayer.isPlaying()) {
                         Message message = new Message();
                         message.what = UPDATE_PLAY_STATE;
@@ -243,10 +239,6 @@ public class VideoPlayerActivity extends Activity {
                         sequence_startTime += MAX_SEQUENCE_LENGTH;
                         sequence_duration = MAX_SEQUENCE_LENGTH;
                     }
-                    Log.d(TAG, "prev_sequence_startTime:" + prev_sequence_startTime +
-                            " prev_sequence_duration:" + prev_sequence_duration);
-                    Log.d(TAG, "sequence_startTime:" + sequence_startTime +
-                            " sequence_duration:" + sequence_duration);
                     isUpdateImageOver = false;
                     rangeSeekBar.setVisibility(View.INVISIBLE);
                     for (int i = 0; i < imageView_list.length; i++)
@@ -423,12 +415,12 @@ public class VideoPlayerActivity extends Activity {
         mSurfaceViewHeight = dm.heightPixels;
         float density = dm.density;
         int densityDpi = dm.densityDpi;
-        Log.d(TAG, "mSurfaceViewWidth:" + mSurfaceViewWidth
-                + " mSurfaceViewHeight:" + mSurfaceViewHeight
-                + " density is:" + density +
-                " densityDpi is:" + densityDpi);
-        Configuration configuration = getResources().getConfiguration();
-        Log.d(TAG, "configuration.orientation is:" + configuration.orientation);
+//        Log.d(TAG, "mSurfaceViewWidth:" + mSurfaceViewWidth
+//                + " mSurfaceViewHeight:" + mSurfaceViewHeight
+//                + " density is:" + density +
+//                " densityDpi is:" + densityDpi);
+//        Configuration configuration = getResources().getConfiguration();
+//        Log.d(TAG, "configuration.orientation is:" + configuration.orientation);
         mediaPlayer = new MediaPlayer();
 //        mediaPlayer.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
 //            @Override
@@ -561,7 +553,7 @@ public class VideoPlayerActivity extends Activity {
 //            image.compress(Bitmap.CompressFormat.JPEG, options, baos);
 //            options -= 10;
 //        }
-        Log.d(TAG,"compress size is :" + baos.toByteArray().length / 1024);
+//        Log.d(TAG,"compress size is :" + baos.toByteArray().length / 1024);
         ByteArrayInputStream isBm = new ByteArrayInputStream(baos.toByteArray());
         Bitmap bitmap = BitmapFactory.decodeStream(isBm, null, null);
         return bitmap;
@@ -570,14 +562,13 @@ public class VideoPlayerActivity extends Activity {
     private Boolean getImageFromVideo() {
         int thumbnail_width = playbackPreview.getWidth();
         int thumbnail_height = playbackPreview.getHeight();
-        Log.d(TAG, "thumbnail_width:" + thumbnail_width + " thumbnail_height:" + thumbnail_height);
+//        Log.d(TAG, "thumbnail_width:" + thumbnail_width + " thumbnail_height:" + thumbnail_height);
         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
         mmr.setDataSource(videoPath);
         long tempStart = sequence_startTime;
         for (int i = 0; i < IMAGE_LIST; i++) {
             if (isExit)
                 break;
-            Log.d(TAG, "tempStart:" + tempStart);
             bitmap_list[i] = mmr.getFrameAtTime(tempStart);
             float width = bitmap_list[i].getWidth();
             float height = bitmap_list[i].getHeight();
@@ -585,11 +576,8 @@ public class VideoPlayerActivity extends Activity {
             float scaleWidth = ((float) thumbnail_width) / width;
             float scaleHeight = ((float) thumbnail_height) / height;
             matrix.postScale(scaleWidth, scaleHeight);
-            Log.d(TAG, "width:" + width + " height:" + height +
-                    " scaleWidth:" + scaleWidth + " scaleHeight:" + scaleHeight);
             Bitmap reBitmap = Bitmap.createBitmap(bitmap_list[i],
                     0, 0, (int) width, (int) height, matrix, true);
-            Log.d(TAG,"reBitmap size is :" + reBitmap.getByteCount());
             //bitmap_list[i] = compressImage(reBitmap);
             bitmap_list[i] = reBitmap;
             tempStart += sequence_duration / IMAGE_LIST;
@@ -657,13 +645,10 @@ public class VideoPlayerActivity extends Activity {
                                     double endCursor,
                                     long startTime,
                                     long duration) {
-        Log.d(TAG,"startCursor" + startCursor + "endCursor" + endCursor);
-        Log.d(TAG,"startTime" + startTime + "duration" + duration);
         long[] clipTime = {0,0};
         clipTime[0] = startTime + (long)((duration * 1.0) * startCursor)/100;
         clipTime[1] = startTime + (long)((duration * 1.0) * endCursor)/100;
         clipTime[1] = clipTime[1] - clipTime[0];
-        Log.d(TAG,"clipTime[0]" + clipTime[0] + "clipTime[1]" + clipTime[1]);
         return clipTime;
     }
 }
