@@ -28,6 +28,7 @@ public class RangeSeekBar extends View {
     private static final int CLICK_IN_LOW_AREA = 3;
     private static final int CLICK_IN_HIGH_AREA = 4;
     private static final int CLICK_OUT_AREA = 5;
+    private static final int CLICK_IN_MIDDLE_AREA = 5;
     private static final int CLICK_INVAILD = 0;
     private static final int[] STATE_NORMAL = {};
     private static final int[] STATE_PRESSED = {
@@ -51,6 +52,10 @@ public class RangeSeekBar extends View {
 
     private double mOffsetLow = 0;     //low slider center coordinate
     private double mOffsetHigh = 0;    //high slider center coordinate
+    private double mPreOffsetLow = 0;
+    private double mPreOffsetHigh = 0;
+    private float preXPosition = 0;
+    private double lowHighDistance = 0;
     private int mDistance = 0;      //total distance
 
     private int mFlag = CLICK_INVAILD;
@@ -180,7 +185,7 @@ public class RangeSeekBar extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        Log.d(TAG, "onDraw" + "mOffsetHigh" + mOffsetHigh);
+        //Log.d(TAG, "onDraw" + " mOffsetHigh" + mOffsetHigh);
         Paint text_Paint = new Paint();
         text_Paint.setTextAlign(Paint.Align.CENTER);
         text_Paint.setColor(Color.RED);
@@ -306,6 +311,12 @@ public class RangeSeekBar extends View {
 ////                        mOffsetHigh = mOffsetLow + mDuration;
 ////                    }
 //                }
+            } else if (mFlag == CLICK_IN_MIDDLE_AREA) {
+                mPreOffsetLow = mOffsetLow;
+                mPreOffsetHigh = mOffsetHigh;
+                preXPosition = e.getX();
+                lowHighDistance = mPreOffsetHigh - mPreOffsetLow;
+                Log.d(TAG, "mPreOffsetLow: " + mPreOffsetLow + " mPreOffsetHigh:" + mPreOffsetHigh + " preXPosition:" + preXPosition);
             }
             //set progress bar
             refresh();
@@ -369,6 +380,26 @@ public class RangeSeekBar extends View {
                         }
                     }
                 }
+            } else if (mFlag == CLICK_IN_MIDDLE_AREA) {
+                if (mOffsetLow > mThumbWidth/2 || mOffsetHigh < mScollBarWidth - mThumbWidth/2) {
+                    Log.d(TAG, " e.getX():" + e.getX() + " mOffsetLow:" + mOffsetLow + " mOffsetHigh:" + mOffsetHigh);
+                    if (e.getX() < preXPosition) {
+                        mOffsetLow = mPreOffsetLow - (preXPosition - e.getX());
+                        mOffsetHigh = mPreOffsetHigh - (preXPosition - e.getX());
+                        if (mOffsetLow <= mThumbWidth/2) {
+                            mOffsetLow = mThumbWidth/2;
+                            mOffsetHigh = mOffsetLow + lowHighDistance;
+                        }
+                    } else if (e.getX() > preXPosition) {
+                        mOffsetLow = mPreOffsetLow + (e.getX() - preXPosition);
+                        mOffsetHigh = mPreOffsetHigh + (e.getX() - preXPosition);
+                        if (mOffsetHigh >= mScollBarWidth - mThumbWidth/2) {
+                            mOffsetHigh = mScollBarWidth - mThumbWidth/2;
+                            mOffsetLow = mOffsetHigh - lowHighDistance;
+                        }
+                    }
+
+                }
             }
             //set progress bar
             refresh();
@@ -399,16 +430,20 @@ public class RangeSeekBar extends View {
             return CLICK_ON_LOW;
         } else if (e.getY() >= top && e.getY() <= bottom && e.getX() >= (mOffsetHigh - mThumbWidth / 2) && e.getX() <= (mOffsetHigh + mThumbWidth / 2)) {
             return CLICK_ON_HIGH;
-        } else if (e.getY() >= top
-                && e.getY() <= bottom
-                && ((e.getX() >= 0 && e.getX() < (mOffsetLow - mThumbWidth / 2)) || ((e.getX() > (mOffsetLow + mThumbWidth / 2))
-                && e.getX() <= (mOffsetHigh + mOffsetLow) / 2))) {
-            return CLICK_IN_LOW_AREA;
-        } else if (e.getY() >= top
-                && e.getY() <= bottom
-                && (((e.getX() > (mOffsetHigh + mOffsetLow) / 2) && e.getX() < (mOffsetHigh - mThumbWidth / 2)) || (e
-                .getX() > (mOffsetHigh + mThumbWidth/2) && e.getX() <= mScollBarWidth))) {
-            return CLICK_IN_HIGH_AREA;
+        } else if (e.getY() >= top && e.getY() <= bottom
+                && e.getX() > (mOffsetLow + mThumbWidth / 2)
+                && e.getX() < (mOffsetHigh - mThumbWidth / 2)) {
+            return CLICK_IN_MIDDLE_AREA;
+//        } else if (e.getY() >= top
+//                && e.getY() <= bottom
+//                && ((e.getX() >= 0 && e.getX() < (mOffsetLow - mThumbWidth / 2)) || ((e.getX() > (mOffsetLow + mThumbWidth / 2))
+//                && e.getX() <= (mOffsetHigh + mOffsetLow) / 2))) {
+//            return CLICK_IN_LOW_AREA;
+//        } else if (e.getY() >= top
+//                && e.getY() <= bottom
+//                && (((e.getX() > (mOffsetHigh + mOffsetLow) / 2) && e.getX() < (mOffsetHigh - mThumbWidth / 2)) || (e
+//                .getX() > (mOffsetHigh + mThumbWidth/2) && e.getX() <= mScollBarWidth))) {
+//            return CLICK_IN_HIGH_AREA;
         } else if (!(e.getX() >= 0 && e.getX() <= mScollBarWidth && e.getY() >= top && e.getY() <= bottom)) {
             return CLICK_OUT_AREA;
         } else {
