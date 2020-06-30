@@ -1,5 +1,10 @@
 package com.rocklee.fexplorer.Decoder;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
@@ -10,23 +15,29 @@ import android.media.MediaMetadataRetriever;
 import android.media.MediaMuxer;
 import android.media.MediaMuxer.OutputFormat;
 import android.media.ThumbnailUtils;
+import android.media.browse.MediaBrowser;
+import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 
-/**
- * Created by admin on 2015/11/9.
- */
 public class VideoDecoder {
     private final static String TAG = "LC_VideoDecoder";
+    private static final String DIR_NAME = "trim";
+    private static final int DEFAULT_BUFFER_SIZE = 1 * 1024 * 1024;
+    private String mOutputPath;
     private MediaCodec mediaDecoder;
     private MediaExtractor mediaExtractor;
     private MediaFormat mediaFormat;
@@ -51,7 +62,155 @@ public class VideoDecoder {
             MediaFormat.KEY_OPERATING_RATE, MediaFormat.KEY_BITRATE_MODE,
             MediaFormat.KEY_AUDIO_SESSION_ID};
 
-    public boolean decodeVideo(String inputFile, String outputFile, long clipPoint, long clipDuration) {
+    private interface ContentResolverQueryCallback {
+        void onCursorResult(Cursor cursor);
+    }
+
+
+    private static void querySource(ContentResolver contentResolver, Uri uri,
+                                    String[] projection, ContentResolverQueryCallback callback) {
+        Cursor cursor = null;
+        try {
+            cursor = contentResolver.query(uri, projection, null, null, null);
+            if ((cursor != null) && cursor.moveToNext()) {
+                callback.onCursorResult(cursor);
+            }
+        } catch (Exception e) {
+            // Ignore error for lacking the data column from the source.
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    private static File getSaveDirectory(ContentResolver contentResolver, Uri uri) {
+        final File[] dir = new File[1];
+        querySource(contentResolver, uri,
+                new String[] { MediaStore.Video.VideoColumns.DATA },
+                new ContentResolverQueryCallback() {
+                    @Override
+                    public void onCursorResult(Cursor cursor) {
+                        dir[0] = new File(cursor.getString(0)).getParentFile();
+                    }
+                });
+        return dir[0];
+    }
+
+    private static final File getCaptureFile(final String type, final String ext) {
+        final File dir = new File(Environment.getExternalStoragePublicDirectory(type), DIR_NAME);
+        Log.d(TAG, "path=" + dir.toString());
+        dir.mkdirs();
+        if (dir.canWrite()) {
+            return new File(dir, ext);
+        }
+        return null;
+    }
+
+    private static void genVideo(Context context, Uri srcPath, String dstPath, long start, long end) throws IOException {
+        MediaExtractor mediaExtractor = new MediaExtractor();
+        mediaExtractor.setDataSource(context, srcPath, null);
+
+        int trackCount = mediaExtractor.getTrackCount();
+        MediaMuxer mediaMuxer = new MediaMuxer(dstPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+
+        HashMap<Integer, Integer> indexMap = new HashMap<>(trackCount);
+        int bufferSize = -1;
+        for (int i = 0; i < trackCount; i++) {
+            MediaFormat format = mediaExtractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+
+            boolean selectCurrentTrack = false;
+
+            if (mime.startsWith("audio/")) {
+                selectCurrentTrack = true;
+            } else if (mime.startsWith("video/")) {
+                selectCurrentTrack = true;
+            }
+
+            if (selectCurrentTrack) {
+                mediaExtractor.selectTrack(i);
+                try {
+                    int dstIndex = mediaMuxer.addTrack(format);
+                    indexMap.put(i, dstIndex);
+                    if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+                        int newSize = format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE);
+                        bufferSize = newSize > bufferSize ? newSize : bufferSize;
+                    }
+                } catch (IllegalArgumentException e) {
+                    Log.e(TAG, "Unsupported format '" + mime + "'");
+                    throw new IOException("MediaMuxer does not support " + mime);
+                }
+            }
+        }
+
+        if (bufferSize < 0) {
+            bufferSize = DEFAULT_BUFFER_SIZE;
+        }
+
+        MediaMetadataRetriever retrieverSrc = new MediaMetadataRetriever();
+        retrieverSrc.setDataSource(context, srcPath);
+        String degreesString = retrieverSrc.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+        if (degreesString != null) {
+            int degrees = Integer.parseInt(degreesString);
+            if (degrees >= 0) {
+                mediaMuxer.setOrientationHint(degrees);
+            }
+        }
+
+        if (start > 0) {
+            mediaExtractor.seekTo(start, MediaExtractor.SEEK_TO_CLOSEST_SYNC);
+        }
+
+        // Copy the samples from MediaExtractor to MediaMuxer. We will loop
+        // for copying each sample and stop when we get to the end of the source
+        // file or exceed the end time of the trimming.
+        int offset = 0;
+        int trackIndex = -1;
+        ByteBuffer dstBuf = ByteBuffer.allocate(bufferSize);
+        MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
+        try {
+            mediaMuxer.start();
+            while (true) {
+                bufferInfo.offset = offset;
+                bufferInfo.size = mediaExtractor.readSampleData(dstBuf, offset);
+                if (bufferInfo.size < 0) {
+                    Log.d(TAG, "Saw input EOS.");
+                    bufferInfo.size = 0;
+                    break;
+                } else {
+                    bufferInfo.presentationTimeUs = mediaExtractor.getSampleTime();
+                    if (end > 0 && bufferInfo.presentationTimeUs > end) {
+                        Log.d(TAG, "The current sample is over the trim end time.");
+                        break;
+                    } else {
+                        bufferInfo.flags = mediaExtractor.getSampleFlags();
+                        trackIndex = mediaExtractor.getSampleTrackIndex();
+
+                        mediaMuxer.writeSampleData(indexMap.get(trackIndex), dstBuf,
+                                bufferInfo);
+                        mediaExtractor.advance();
+                    }
+                }
+            }
+
+            mediaMuxer.stop();
+        } catch (IllegalStateException e) {
+            // Swallow the exception due to malformed source.
+            Log.w(TAG, "The source video file is malformed");
+            File f = new File(dstPath);
+            if (f.exists()) {
+                f.delete();
+            }
+            throw e;
+        } finally {
+            mediaMuxer.release();
+        }
+        return;
+    }
+
+    public boolean decodeVideo(Context context, Uri inputFile, String outputFile, long clipPoint, long clipDuration) throws FileNotFoundException {
         //MediaMetadataRetriever
         int videoTrackIndex = -1;
         int audioTrackIndex = -1;
@@ -60,12 +219,31 @@ public class VideoDecoder {
         int sourceVTrack = 0;
         int sourceATrack = 0;
         long videoDuration, audioDuration;
-        String videoPhoto = inputFile.substring(0, inputFile.lastIndexOf(".")) + "_photo.png";
+        Uri outputUri;
+        //String videoPhoto = inputFile.substring(0, inputFile.lastIndexOf(".")) + "_photo.png";
         //saveBitmap(videoPhoto, getVideoThumbnail(url, 180, 180, MediaStore.Video.Thumbnails.MINI_KIND));
+        Log.i(TAG, "decodeVideo entry");
+        File tempFile;
+        try {
+            tempFile = File.createTempFile(outputFile, null, context.getCacheDir());
+        } catch (IOException e) {
+            tempFile = new File(context.getExternalFilesDir(Environment.DIRECTORY_DCIM), "/" + outputFile);
+        }
+        mOutputPath = tempFile.toString();
+
+        Log.d(TAG, "output file is " + mOutputPath);
+
+        ContentResolver contentResolver = context.getContentResolver();
+        ContentValues contentValues = new ContentValues();
+        contentValues.put(MediaStore.Video.Media.DISPLAY_NAME, outputFile);
+        contentValues.put(MediaStore.Video.Media.MIME_TYPE, "video/mp4");
+        contentValues.put(MediaStore.Video.Media.RELATIVE_PATH, "DCIM");
+        contentValues.put(MediaStore.Video.Media.DATE_MODIFIED, System.currentTimeMillis());
+        outputUri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, contentValues);
         mediaExtractor = new MediaExtractor();
         try {
-            mediaExtractor.setDataSource(inputFile);
-            mediaMuxer = new MediaMuxer(outputFile, OutputFormat.MUXER_OUTPUT_MPEG_4);
+            mediaExtractor.setDataSource(context, inputFile, null);
+            mediaMuxer = new MediaMuxer(mOutputPath, OutputFormat.MUXER_OUTPUT_MPEG_4);
         } catch (Exception e) {
             Log.e(TAG, "error path" + e.getMessage());
             return false;
@@ -75,10 +253,11 @@ public class VideoDecoder {
                 mediaFormat = mediaExtractor.getTrackFormat(i);
                 mime = mediaFormat.getString(MediaFormat.KEY_MIME);
                 if (mime.startsWith("video/")) {
-//                    for (String x : key) {
-//                        if (mediaFormat.containsKey(x))
-//                            Log.d(TAG, x + " is exist");
-//                    }
+                    Log.i(TAG, "video entry");
+                    for (String x : key) {
+                        if (mediaFormat.containsKey(x))
+                            Log.d(TAG, x + " is exist");
+                    }
                     sourceVTrack = i;
                     int width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
                     int height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
@@ -100,10 +279,11 @@ public class VideoDecoder {
                     videoTrackIndex = mediaMuxer.addTrack(mediaFormat);
                 }
                 else if (mime.startsWith("audio/")) {
-//                    for (String x : key) {
-//                        if (mediaFormat.containsKey(x))
-//                            Log.d(TAG, x + " is exist");
-//                    }
+                    Log.i(TAG, "audio entry");
+                    for (String x : key) {
+                        if (mediaFormat.containsKey(x))
+                            Log.d(TAG, x + " is exist");
+                    }
                     sourceATrack = i;
                     int sampleRate = mediaFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
                     int channelCount = mediaFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
@@ -120,6 +300,18 @@ public class VideoDecoder {
                 Log.e(TAG, " read error " + e.getMessage());
             }
         }
+
+        MediaMetadataRetriever retrieverSrc = new MediaMetadataRetriever();
+        retrieverSrc.setDataSource(context, inputFile);
+        String degreesString = retrieverSrc.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION);
+        if (degreesString != null) {
+            int degrees = Integer.parseInt(degreesString);
+            if (degrees >= 0) {
+                mediaMuxer.setOrientationHint(degrees);
+            }
+        }
+
         ByteBuffer inputBuffer = ByteBuffer.allocate(videoMaxInputSize);
         //save some frame
 //        int count = 0;
@@ -141,8 +333,10 @@ public class VideoDecoder {
         {
             mediaExtractor.readSampleData(inputBuffer, 0);
             //skip first I frame
-            if (mediaExtractor.getSampleFlags() == MediaExtractor.SAMPLE_FLAG_SYNC)
+            if (mediaExtractor.getSampleFlags() == MediaExtractor.SAMPLE_FLAG_SYNC) {
                 mediaExtractor.advance();
+                Log.i(TAG, "skip first I frame");
+            }
             mediaExtractor.readSampleData(inputBuffer, 0);
             long firstVideoPTS = mediaExtractor.getSampleTime();
             mediaExtractor.advance();
@@ -175,7 +369,8 @@ public class VideoDecoder {
 //            count++;
             //save some frame
             int trackIndex = mediaExtractor.getSampleTrackIndex();
-            long presentationTimeUs = mediaExtractor.getSampleTime();
+            //long presentationTimeUs = mediaExtractor.getSampleTime();
+            videoInfo.presentationTimeUs = mediaExtractor.getSampleTime();
             int sampleFlag = mediaExtractor.getSampleFlags();
             if (sampleFlag == 1) {
 //                String IFramePhoto = url.substring(0, url.lastIndexOf(".")) + "_" + IFrameCount + ".png";
@@ -186,16 +381,18 @@ public class VideoDecoder {
 //                    + ";presentationTimeUs is " + presentationTimeUs
 //                    + ";sampleFlag is " + sampleFlag
 //                    + ";sampleSize is " + sampleSize);
-            if ((clipDuration != 0) && (presentationTimeUs > (clipPoint + clipDuration))) {
+            //if ((clipDuration != 0) && (presentationTimeUs > (clipPoint + clipDuration))) {
+            if ((clipDuration != 0) && (videoInfo.presentationTimeUs > (clipPoint + clipDuration))) {
                 mediaExtractor.unselectTrack(sourceVTrack);
                 break;
             }
-            mediaExtractor.advance();
+            //mediaExtractor.advance();
             videoInfo.offset = 0;
             videoInfo.size = sampleSize;
             videoInfo.flags = sampleFlag;
             mediaMuxer.writeSampleData(videoTrackIndex, inputBuffer, videoInfo);
-            videoInfo.presentationTimeUs += videoSampleTime;//presentationTimeUs;
+            //videoInfo.presentationTimeUs += videoSampleTime;//presentationTimeUs;
+            mediaExtractor.advance();
         }
         //audio part
         mediaExtractor.selectTrack(sourceATrack);
@@ -241,6 +438,38 @@ public class VideoDecoder {
         mediaMuxer.release();
         mediaExtractor.release();
         mediaExtractor = null;
+        BufferedInputStream inputStream = null;
+        OutputStream os = context.getContentResolver().openOutputStream(outputUri);
+        byte[] buffer = new byte[1024];
+        int len;
+        try {
+            inputStream = new BufferedInputStream(new FileInputStream(mOutputPath));
+            Log.i(TAG, "try to read");
+            while ((len = inputStream.read(buffer)) != -1) {
+                os.write(buffer, 0, len);
+                //total += len;
+            }
+            os.flush();
+            inputStream.close();
+            os.close();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (inputStream != null)
+                    inputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if (!tempFile.delete()) {
+            if(context.deleteFile(tempFile.toString()))
+                Log.i(TAG,  "delete temp file " + tempFile + " at DCIM dir");
+        } else {
+            Log.i(TAG,  "delete temp file " + tempFile + " at cache dir");
+        }
         return true;
     }
 
