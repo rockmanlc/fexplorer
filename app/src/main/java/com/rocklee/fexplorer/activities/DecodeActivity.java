@@ -1,4 +1,4 @@
-package com.rocklee.fexplorer;
+package com.rocklee.fexplorer.activities;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -6,6 +6,7 @@ import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaPlayer;
+import android.media.MediaMetadataRetriever;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -22,6 +23,7 @@ import java.nio.ByteBuffer;
 public class DecodeActivity extends Activity implements SurfaceHolder.Callback {
     private PlayerThread mPlayer = null;
     private String videoPath;
+    protected MediaMetadataRetriever mRetriever;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,15 +64,19 @@ public class DecodeActivity extends Activity implements SurfaceHolder.Callback {
         private MediaCodec decoder;
         private Surface surface;
 
-        public PlayerThread(Surface surface) {
+        private PlayerThread(Surface surface) {
             this.surface = surface;
         }
 
         @Override
         public void run() {
             extractor = new MediaExtractor();
+            mRetriever = new MediaMetadataRetriever();
             try {
                 extractor.setDataSource(videoPath);
+                mRetriever.setDataSource(videoPath);
+                String Date = mRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE);
+                Log.e("DecodeActivity", "Date is " + Date);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -78,6 +84,7 @@ public class DecodeActivity extends Activity implements SurfaceHolder.Callback {
             for (int i = 0; i < extractor.getTrackCount(); i++) {
                 MediaFormat format = extractor.getTrackFormat(i);
                 String mime = format.getString(MediaFormat.KEY_MIME);
+                Log.e("DecodeActivity", "mime is " + mime);
                 if (mime.startsWith("video/")) {
                     extractor.selectTrack(i);
                     try {

@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="com.rocklee.fexplorer.VideoPlayerActivity">
+    tools:context="com.rocklee.fexplorer.activities.VideoPlayerActivity">
 
     <SurfaceView
         android:layout_width="match_parent"
@@ -171,10 +171,11 @@
             android:clickable="true"
             android:background="#b2f1f1f1"
             android:layout_alignParentTop="true"
-            android:layout_alignParentStart="true">
+            android:layout_alignParentStart="true"
+            android:weightSum="1">
 
             <TextView
-                android:layout_width="120dp"
+                android:layout_width="47dp"
                 android:layout_height="match_parent"
                 android:textColor="#646464"
                 android:id="@+id/cancel"
@@ -183,17 +184,18 @@
                 android:gravity="center"/>
 
             <TextView
-                android:layout_width="1040dp"
+                android:layout_width="244dp"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:id="@+id/file_name"
                 android:gravity="center"
                 android:text="123"
                 android:textColor="#000000"
-                android:textSize="30sp"/>
+                android:textSize="30sp"
+                android:layout_weight="0.98" />
 
             <TextView
-                android:layout_width="120dp"
+                android:layout_width="48dp"
                 android:layout_height="match_parent"
                 android:textColor="#646464"
                 android:id="@+id/trim"

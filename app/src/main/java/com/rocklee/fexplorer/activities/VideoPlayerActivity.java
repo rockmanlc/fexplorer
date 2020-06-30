@@ -1,18 +1,26 @@
-package com.rocklee.fexplorer;
+package com.rocklee.fexplorer.activities;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.AudioManager;
+import android.media.MediaExtractor;
+import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.os.ParcelFileDescriptor;
+import android.provider.MediaStore;
+import android.support.annotation.RequiresApi;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -29,10 +37,15 @@ import android.widget.Toast;
 
 import com.rocklee.fexplorer.CustomView.RangeSeekBar;
 import com.rocklee.fexplorer.Decoder.VideoDecoder;
+import com.rocklee.fexplorer.R;
+import com.rocklee.fexplorer.utils.VideoContainer;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.Date;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -48,6 +61,7 @@ public class VideoPlayerActivity extends Activity {
     //A sequence should have 7 image
     private final static int IMAGE_LIST = 7;
 
+    private Context mContext;
     private SeekBar seekbar = null;
     private ImageButton videoPlay, back, clip;
     private TextView cancel;
@@ -70,6 +84,10 @@ public class VideoPlayerActivity extends Activity {
     private Timer mTimer;
     private TimerTask mTimerTask;
     private String videoPath;
+    private String videoName;
+    private Set<String> volumeNames;
+    private Uri videoUri;
+    private VideoContainer videoContainer;
     private boolean isChanging = false;//is seekbar changing
     private boolean isPlaying = false;//is video playing
     private boolean isTrimPanel = false;
@@ -82,6 +100,9 @@ public class VideoPlayerActivity extends Activity {
     private int maxDuration;
     private int mTime;
     private double lowCursor, highCursor;
+
+    private MediaExtractor extractor;
+    private MediaMetadataRetriever mRetriever;
 
     private Handler handler = new Handler() {
         public void handleMessage(Message msg) {
@@ -122,14 +143,47 @@ public class VideoPlayerActivity extends Activity {
         }
     };
 
+    @RequiresApi(api = Build.VERSION_CODES.Q)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        mContext = getApplicationContext();
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         setContentView(R.layout.activity_video_player);
         Intent intent = getIntent();
-        videoPath = intent.getStringExtra("video_path");
-        Log.d(TAG, "video_path is " + videoPath);
+        volumeNames = MediaStore.getExternalVolumeNames(this);
+        videoPath = volumeNames.iterator().next();
+        videoContainer = (VideoContainer) intent.getSerializableExtra("video_uri");
+        videoUri = Uri.parse(videoContainer.uri);
+        videoName = videoContainer.name;
+        Log.d(TAG, "video_Uri is " + videoUri + ", videoName is " + videoName + ", videoPath is " + videoPath);
+//        String readOnlyMode = "r";
+//        ParcelFileDescriptor pfd = null;
+//        ContentResolver resolver = getApplicationContext()
+//                .getContentResolver();
+//        try {
+//            pfd = resolver.openFileDescriptor(videoUri, readOnlyMode)
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
+        extractor = new MediaExtractor();
+        mRetriever = new MediaMetadataRetriever();
+        try {
+            extractor.setDataSource(this, videoUri, null);
+            mRetriever.setDataSource(this,videoUri);
+            String Date = mRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DATE);
+            Log.d(TAG, "Date is " + Date);
+            Log.d(TAG, "TrackCount is " + extractor.getTrackCount());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        for (int i = 0; i < extractor.getTrackCount(); i++) {
+            MediaFormat format = extractor.getTrackFormat(i);
+            String mime = format.getString(MediaFormat.KEY_MIME);
+            Log.d(TAG, "mime is " + mime);
+        }
+
         //first panel
         videoPlay = (ImageButton) findViewById(R.id.play);
         videoPlay.setOnClickListener(new ClickEvent());
@@ -142,7 +196,7 @@ public class VideoPlayerActivity extends Activity {
         current_time = (TextView) findViewById(R.id.start_time);
         total_time = (TextView) findViewById(R.id.total_time);
         myCtlPanel = (RelativeLayout) findViewById(R.id.control_panel);
-        surfaceView = (SurfaceView) findViewById(R.id.video);
+        surfaceView = findViewById(R.id.video);
         surfaceView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -275,15 +329,23 @@ public class VideoPlayerActivity extends Activity {
                                 tempCursor[1],
                                 sequence_startTime,
                                 sequence_duration);
-                        String outputPath = videoPath.substring(0, videoPath.lastIndexOf("."))
+                        String outputPath = System.currentTimeMillis()
                                 + "_" + String.format("%04d", (int)(tempClipTime[0]/1000000))
                                 + "_" + String.format("%04d", (int)((tempClipTime[0] + tempClipTime[1])/1000000))
                                 + ".mp4";
+                        Log.i(TAG, "outputPath is " + outputPath);
                         VideoDecoder videoDecoder = new VideoDecoder();
-                        if (videoDecoder.decodeVideo(videoPath, outputPath, tempClipTime[0], tempClipTime[1])) {
-                            Message message = new Message();
-                            message.what = CLIP_OK;
-                            handler.sendMessage(message);
+                        try {
+                            if (videoDecoder.decodeVideo(mContext, videoUri, outputPath, tempClipTime[0], tempClipTime[1])) {
+                                Message message = new Message();
+                                message.what = CLIP_OK;
+                                handler.sendMessage(message);
+                            } else {
+                                Log.i(TAG, "decode fail");
+                                waitingDialog.dismiss();
+                            }
+                        } catch (FileNotFoundException e) {
+                            e.printStackTrace();
                         }
                     }
                 }).start();
@@ -400,7 +462,7 @@ public class VideoPlayerActivity extends Activity {
         @Override
         public void onStopTrackingTouch(SeekBar seekBar) {
             //mediaPlayer.seekTo(seekBar.getProgress());
-            if (isPlaying == true) {
+            if (isPlaying) {
                 videoPlay.setImageDrawable(getResources().getDrawable(R.drawable.pause));
                 mediaPlayer.start();
             }
@@ -453,7 +515,7 @@ public class VideoPlayerActivity extends Activity {
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         mediaPlayer.setDisplay(surfaceHolder);
         try {
-            mediaPlayer.setDataSource(videoPath);
+            mediaPlayer.setDataSource(this, videoUri);
             mediaPlayer.prepare();
         } catch (IOException e) {
             e.printStackTrace();
@@ -470,7 +532,7 @@ public class VideoPlayerActivity extends Activity {
                 mTimerTask = new TimerTask() {
                     @Override
                     public void run() {
-                        if (isChanging == true)
+                        if (isChanging)
                             return;
                         seekbar.setProgress(mediaPlayer.getCurrentPosition());
                         Message message = new Message();
@@ -483,7 +545,7 @@ public class VideoPlayerActivity extends Activity {
                 if (maxDuration > MAX_SEQUENCE_LENGTH/1000)
                     sequence_duration = MAX_SEQUENCE_LENGTH;
                 else
-                    sequence_duration = (long)(maxDuration*1000);
+                    sequence_duration = maxDuration*1000;
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
@@ -565,7 +627,7 @@ public class VideoPlayerActivity extends Activity {
         int thumbnail_height = playbackPreview.getHeight();
 //        Log.d(TAG, "thumbnail_width:" + thumbnail_width + " thumbnail_height:" + thumbnail_height);
         MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-        mmr.setDataSource(videoPath);
+        mmr.setDataSource(this, videoUri);
         long tempStart = sequence_startTime;
         for (int i = 0; i < IMAGE_LIST; i++) {
             if (isExit)

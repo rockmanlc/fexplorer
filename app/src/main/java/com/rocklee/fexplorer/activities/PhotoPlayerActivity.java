@@ -1,11 +1,12 @@
-package com.rocklee.fexplorer;
+package com.rocklee.fexplorer.activities;
 
 import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.util.Log;
+
+import com.rocklee.fexplorer.GifView;
+import com.rocklee.fexplorer.R;
 
 public class PhotoPlayerActivity extends Activity {
     private static final String TAG = "LC_PhotoPlayerActivity";
