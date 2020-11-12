@@ -37,8 +37,10 @@ public class QueryMedia {
         Cursor cursor = context.getContentResolver().query(
                 MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                 projection,
-                selection,
-                selectionArgs,
+                /*selection,*/
+                /*selectionArgs,*/
+                null,
+                null,
                 sortOrder);
 
         // Cache column indices.

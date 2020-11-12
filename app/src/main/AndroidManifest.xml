@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme" >
         <activity
-            android:name=".activities.FExplorerActivity"
+            android:name=".test.Counter"
             android:launchMode="singleTask" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,6 +24,8 @@
         <activity android:name=".activities.PhotoPlayerActivity" />
         <activity android:name=".activities.VideoPlayerActivity" />
         <activity android:name=".activities.DecodeActivity" />
+        <service android:name=".test.CounterService"
+            android:enabled="true" />
     </application>
 
 </manifest>

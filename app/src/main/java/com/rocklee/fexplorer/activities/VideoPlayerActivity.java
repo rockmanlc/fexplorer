@@ -9,6 +9,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.media.AudioManager;
+import android.media.MediaCodec;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
 import android.media.MediaMetadataRetriever;
@@ -103,6 +104,10 @@ public class VideoPlayerActivity extends Activity {
 
     private MediaExtractor extractor;
     private MediaMetadataRetriever mRetriever;
+    private MediaCodec mediaCodec;
+    private int videoWidth;
+    private int videoHeight;
+    private long videoDuration;
 
     private Handler handler = new Handler() {
         public void handleMessage(Message msg) {
@@ -157,15 +162,7 @@ public class VideoPlayerActivity extends Activity {
         videoUri = Uri.parse(videoContainer.uri);
         videoName = videoContainer.name;
         Log.d(TAG, "video_Uri is " + videoUri + ", videoName is " + videoName + ", videoPath is " + videoPath);
-//        String readOnlyMode = "r";
-//        ParcelFileDescriptor pfd = null;
-//        ContentResolver resolver = getApplicationContext()
-//                .getContentResolver();
-//        try {
-//            pfd = resolver.openFileDescriptor(videoUri, readOnlyMode)
-//        } catch (FileNotFoundException e) {
-//            e.printStackTrace();
-//        }
+
         extractor = new MediaExtractor();
         mRetriever = new MediaMetadataRetriever();
         try {
@@ -182,6 +179,19 @@ public class VideoPlayerActivity extends Activity {
             MediaFormat format = extractor.getTrackFormat(i);
             String mime = format.getString(MediaFormat.KEY_MIME);
             Log.d(TAG, "mime is " + mime);
+            if (mime.startsWith("video/")) {
+                videoWidth = format.getInteger(MediaFormat.KEY_WIDTH);
+                videoHeight = format.getInteger(MediaFormat.KEY_HEIGHT);
+                videoDuration = format.getLong(MediaFormat.KEY_DURATION);
+                Log.d(TAG, "videoWidth is " + videoWidth + ", videoHeight is " + videoHeight + ", duration is " + videoDuration);
+//                extractor.selectTrack(i);
+//                try {
+//                    mediaCodec = MediaCodec.createDecoderByType(mime);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//                mediaCodec.configure(format, surfaceHolder.getSurface(), null, 0);
+            }
         }
 
         //first panel
@@ -377,20 +387,6 @@ public class VideoPlayerActivity extends Activity {
         return super.onKeyDown(keyCode, event);
     }
 
-//    private void playVideo(final String videoPath) {
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                videoView.setVideoPath(videoPath);
-//                videoView.setMediaController(mediaController);
-//                mediaController.setMediaPlayer(videoView);
-//                videoView.requestFocus();
-//                VideoDecoder videoDecoder = new VideoDecoder();
-//                videoDecoder.decodeVideo(videoPath, 5000000, 55000000);
-//            }
-//        }).start();
-//    }
-
     class ClickEvent implements View.OnClickListener{
         @Override
         public void onClick(View v) {
@@ -474,44 +470,12 @@ public class VideoPlayerActivity extends Activity {
     private void initMedia() {
         DisplayMetrics dm = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(dm);
-        mSurfaceViewWidth = dm.widthPixels;
-        mSurfaceViewHeight = dm.heightPixels;
+        mSurfaceViewWidth = videoWidth;//dm.widthPixels;
+        mSurfaceViewHeight = videoHeight;//dm.heightPixels;
         float density = dm.density;
         int densityDpi = dm.densityDpi;
-//        Log.d(TAG, "mSurfaceViewWidth:" + mSurfaceViewWidth
-//                + " mSurfaceViewHeight:" + mSurfaceViewHeight
-//                + " density is:" + density +
-//                " densityDpi is:" + densityDpi);
-//        Configuration configuration = getResources().getConfiguration();
-//        Log.d(TAG, "configuration.orientation is:" + configuration.orientation);
+
         mediaPlayer = new MediaPlayer();
-//        mediaPlayer.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
-//            @Override
-//            public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
-//                if (width == 0 || height == 0) {
-//                    Log.e(TAG, "invalid video width(" + width + ") or height(" + height
-//                            + ")");
-//                    return;
-//                }
-//                Log.d(TAG, "onVideoSizeChanged width:" + width + " height:" + height);
-//                int w = mSurfaceViewHeight * width / height;
-//                int h = mSurfaceViewWidth * height / width;
-//                int wMargin = (mSurfaceViewWidth - w) / 2;
-//                int hMargin = (mSurfaceViewHeight - h) / 2;
-//                if (wMargin == 0 && hMargin == 0) {
-//                    if (mSurfaceViewWidth > width && mSurfaceViewHeight > height) {
-//                        wMargin = (mSurfaceViewWidth - width) / 2;
-//                        hMargin = (mSurfaceViewHeight - height) / 2;
-//                    }
-//                }
-//                Log.d(TAG, "wMargin:" + wMargin + " hMargin:" + hMargin);
-//                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-//                        FrameLayout.LayoutParams.MATCH_PARENT,
-//                        FrameLayout.LayoutParams.MATCH_PARENT);
-//                lp.setMargins(wMargin, hMargin, wMargin, hMargin);
-//                surfaceView.setLayoutParams(lp);
-//            }
-//        });
         mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
         mediaPlayer.setDisplay(surfaceHolder);
         try {
@@ -525,7 +489,7 @@ public class VideoPlayerActivity extends Activity {
             public void onPrepared(MediaPlayer mp) {
                 mediaPlayer.start();
                 mediaPlayer.pause();
-                maxDuration = mediaPlayer.getDuration();
+                maxDuration = (int) videoDuration;//mediaPlayer.getDuration();
                 seekbar.setMax(maxDuration);
                 total_time.setText(intTimeToString(maxDuration));
                 mTimer = new Timer();
@@ -611,12 +575,6 @@ public class VideoPlayerActivity extends Activity {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         image.compress(Bitmap.CompressFormat.PNG, 0, baos);
         int options = 100;
-//        while ( baos.toByteArray().length / 1024>100) {
-//            baos.reset();
-//            image.compress(Bitmap.CompressFormat.JPEG, options, baos);
-//            options -= 10;
-//        }
-//        Log.d(TAG,"compress size is :" + baos.toByteArray().length / 1024);
         ByteArrayInputStream isBm = new ByteArrayInputStream(baos.toByteArray());
         Bitmap bitmap = BitmapFactory.decodeStream(isBm, null, null);
         return bitmap;

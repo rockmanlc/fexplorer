@@ -18,9 +18,6 @@ import com.rocklee.fexplorer.R;
 
 import java.math.BigDecimal;
 
-/**
- * Created by admin on 2015/12/2.
- */
 public class RangeSeekBar extends View {
     private static final String TAG = "RangeSeekBar";
     private static final int CLICK_ON_LOW = 1;      //click at the low slider

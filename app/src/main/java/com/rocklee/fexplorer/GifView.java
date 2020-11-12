@@ -5,10 +5,10 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.View;
 
 import com.rocklee.fexplorer.Decoder.GifDecoder;
+import com.rocklee.fexplorer.activities.PhotoPlayerActivity;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
